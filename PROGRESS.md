@@ -2,7 +2,7 @@
 
 > **Every session:** read this after CLAUDE.md. **Before ending a session:** update the status table, tick tasks, add a session log entry, record decisions and known issues, and write handoff notes. The next session has no other memory.
 
-## Current phase: **Phase 6 — ML training & evaluation** (not started; Phase 5 done)
+## Current phase: **Phase 7 — Production hardening & deploy** (Phase 6 tooling done; the real-data numbers are blocked on videos, see Known issues)
 
 ## Phase status
 
@@ -15,8 +15,8 @@
 | 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ✅ done | `phase-3-auth-users` | 2026-10-01 |
 | 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ✅ done | `phase-4-frontend` | 2026-10-01 |
 | 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⚠️ done (PDF report skipped) | `phase-5-review-reports-admin` | 2026-10-01 |
-| 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⏳ next | `phase-6-ml` | |
-| 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ⬜ | `phase-7-production` | |
+| 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⚠️ tooling done; no real data (see Known issues) | `phase-6-ml` | 2026-10-01 |
+| 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ⏳ next | `phase-7-production` | |
 
 Legend: ⬜ not started · ⏳ next / in progress · ✅ done · ⚠️ done with caveats (see Known issues)
 
@@ -31,6 +31,19 @@ Dependencies: 0 → 1 → 2 → 3 → 4 → 5. Phase 6 needs 1 and 2 (it's bette
 ## Current-phase task checklist
 
 Copy the task list from the current phase doc here at session start, and tick items as you go.
+
+Phase 6 (tooling done and tested on synthetic data; training and real-data numbers are blocked on videos):
+- [x] Eval harness first: `backend/vms/evaluation/{labels,runner,scoring,report,calibrate,export,cli}.py`; `ml/evaluate.py --labels … --rubric … [--weights] [--from-cache]` writes `data/eval/report_<ts>.{json,md}`: confusion matrix, per-step accuracy, **false-pass rate**, review rate, runtime. Per-video metrics are cached in `data/eval/cache/`, so re-scoring with another rubric skips the CV run
+- [x] `ml/eval_labels.example.csv` + `ml/make_synthetic_eval.py` (6 synthetic videos); `python -m vms.cli export-eval` turns human reviews into a labels file
+- [x] `ml/extract_frames.py`: `--every-seconds`, `--max-per-video`, dHash dedupe, output `data/frames/<video>/`
+- [x] `ml/dataset/README.md` annotation guide, `ml/data.yaml`, `ml/train.py` (writes `data/models/vms-det-<date>.pt` + `.model_card.json` with metrics, classes, class map, data hash). **Not run** (no annotated data)
+- [x] Model-card-driven class map (`detectors/model_card.py`, 8 roles); YOLO on every k-th valid frame (`VMS_YOLO_EVERY_N`) and on tag-heuristic frames, flags carried forward
+- [x] New metrics `seal_visible_ratio`, `hand_with_product_ratio`, `tag_close_up_ratio`, `label_and_barcode_ratio`; rubrics `forward-v2`, `return-v2` (v1 untouched)
+- [x] `ml/calibrate.py`: coordinate-descent grid search on cached metrics, objective = false passes first, then review + false fails; prints a YAML diff; never edits a rubric, never touches caps
+- [x] `VMS_RUBRIC_FORWARD` / `VMS_RUBRIC_RETURN` pick the active rubric (config-only); `analyze_video(..., rubric_id=)` override
+- [ ] Better side counting from package-box tracking (optional): **not done**
+- [ ] Real data: eval report in `docs/eval/`, v2 false-pass <= v1 on real labels, trained mAP: **blocked** (no videos, no labels)
+- [x] Backend suite **323 passed** (30 new in `test_evaluation.py`); ruff clean
 
 Phase 5 (done except the stretch PDF):
 - [x] `services/reviews.py`: pass/fail + reason code (§7 list) + comment; comment required for `other` or when overturning a model pass/fail; append-only, latest wins via `refresh_final_status`; audit `review.created` (model status, decision, reason, comment)
@@ -184,6 +197,16 @@ Phase 0 (all done):
 | 2026-10-01 | 5 | Toasts moved from bottom-right to top-right under the header | They covered the sticky ReviewBar's Fail/Pass buttons during rapid reviewing. |
 | 2026-10-01 | 5 | `docs/SOP.md` is generated (`vms/sop_doc.py`). Plain wording per check lives in `WHAT_IT_LOOKS_FOR`; thresholds and fail notes come from the YAML | Keeps the operator guide in sync with rubric versions; a test enforces it. |
 | 2026-10-01 | 5 | PDF report (`/videos/{id}/report.pdf`) **not built** | Stretch goal; it would add reportlab/weasyprint. The detail page has no "Download report" button yet. |
+| 2026-10-01 | 6 | Branched `phase-6-ml` from `phase-5-review-reports-admin` | Earlier phases still aren't merged into `main`. |
+| 2026-10-01 | 6 | Evaluation logic lives in the package `vms.evaluation`; `ml/evaluate.py` and `ml/calibrate.py` are thin wrappers | Testable under `backend/tests`, no sys.path tricks. `ml/train.py` and `ml/extract_frames.py` stay standalone scripts. |
+| 2026-10-01 | 6 | **False-pass rate** = videos a human did not pass (review or fail) that the model marked pass, over all such videos. Also reported against human `fail` only | A human `review` means the case was unsettled, so a model pass there is unsafe too. |
+| 2026-10-01 | 6 | Cache key = video path/size/mtime + metric set + engine settings + weights mtime + model card text. The rubric is not in the key | Rubric changes re-score instantly; weight, setting or metric-set changes re-run the CV. |
+| 2026-10-01 | 6 | Model card is `<weights stem>.model_card.json` beside the weights (or `VMS_YOLO_MODEL_CARD`), not a bare `model_card.json` | Several dated weights can share `data/models/`. A bad card logs a warning and falls back to `VMS_YOLO_CLASS_MAP`. |
+| 2026-10-01 | 6 | v2 rubrics keep step keys, weights (30/20/25/25), decision cutoffs and **caps identical to v1** and add checks for seal, hand-on-product, tag close-up and label+barcode together (points taken from existing checks) | Review-first is not weakened. Without a custom model the new checks score 0, so v2 can't pass on heuristics or COCO alone. |
+| 2026-10-01 | 6 | `DEFAULT_RUBRICS` removed; `active_rubric_ids()` reads settings. The rubrics API, the reports CSV titles and `docs/SOP.md` follow the active rubrics | Config-only switching (acceptance 3). |
+| 2026-10-01 | 6 | Calibration objective: (false passes, review + false fails) in lexicographic order; only decision cutoffs and numeric check thresholds are tuned. Warns below 30 labelled videos | A plain "fewest reviews" objective would pick all-fail. A human copies the diff into a new rubric id. |
+| 2026-10-01 | 6 | `export-eval` is a CLI (`python -m vms.cli export-eval`), not `GET /reports/export.csv?format=eval` | The phase doc allowed either; the file needs server-side video paths, which shouldn't go over HTTP. Reviews only carry pass/fail, so the exported step columns are blank. |
+| 2026-10-01 | 6 | Optional box-tracking side counting not built | No real footage to compare it with v1; v1 `estimated_sides` stays. |
 
 ## Open questions for the user (from IMPLEMENTATION.md §11)
 
@@ -210,6 +233,11 @@ Phase 0 (all done):
 
 - Fixed in Phase 1: `process_type` now selects the rubric; YOLO is used; `estimated_sides` is scored (Return `six_sides`).
 - Heuristic weaknesses for Phase 6: (a) the label / tag / package contour heuristics fire on almost any textured frame (label_ratio ≈ 1.0 on synthetic video), so they barely discriminate. (b) Motion magnitude is the **mean over the whole frame**, so small moving objects stay below `ACTIVE_MAGNITUDE` (a 60 s synthetic box gives 0 direction changes), and the left-vs-right-half direction heuristic can flip as one object crosses the centre (a monotonic 3 s move gives 2 changes). (c) The `avg_text_blocks` thresholds (>5 / >3) came from v1 `readtext` counts and haven't been re-tuned on real footage for `detect()` at 480 px. (d) The COCO class map is a stopgap.
+- **Phase 6 blocker: no real sample videos (`data/samples/` doesn't exist) and no `data/eval/labels.csv`.** The harness, training script, v2 rubrics and calibration are built and tested on synthetic data. Still missing: a trained detector (no mAP), any real output from a custom model for `forward-v2` / `return-v2`, and real v1-vs-v2 numbers. Needed: 50+ videos (ideally 200+) with a human pass/review/fail each, and 300+ annotated boxes per class.
+- Phase 6: with COCO or heuristics only, v2's four new checks score 0 (at most 81 points Return / 77 Forward, under the 85 pass cutoff, so it can't pass). Don't set `VMS_RUBRIC_*=…-v2` in production before a custom model exists.
+- Phase 6: the synthetic labels are my own judgement of synthetic videos (barcode-only = review; dark, blurred, 1 s = fail). They exercise the tooling; they don't measure accuracy.
+- Phase 6: `ml/train.py` has not been run (no dataset). It imports `ultralytics` only inside `train()`. Smoke-test it on a tiny dataset first.
+- Phase 6: the package-box heuristic fires on almost any frame, so the synthetic per-step accuracy for `unboxing` is 0 % (labelled missed). Known Phase 1 weakness; the custom `package_box` / `package_polybag` classes should fix it.
 - No real sample videos yet (`data/samples/` is empty). The timings below come from a synthetic video.
 - Fixed in Phase 0: models loading at import, OCR cadence, free +5, hard-coded sides.
 - `app.py` is not covered by ruff (legacy, retired in Phase 7).
@@ -225,6 +253,18 @@ Phase 0 (all done):
 - Stale jobs are re-queued at the start of each worker loop iteration, so nothing reaps them while every worker is busy.
 
 ## Session log
+
+### 2026-10-01 — Phase 6 session
+- Baseline 293 passed. Branch `phase-6-ml`. Backend now **323 passed**; ruff clean (backend and ml). Frontend typecheck, lint and 26 tests are green (only `copy.ts` gained 4 check labels).
+- No real data, so everything ran on `ml/make_synthetic_eval.py` videos (6 x 12 s, 320x240). **Acceptance 1**: `python ml/evaluate.py --labels ml/eval_labels.example.csv --rubric return-v1,forward-v1` ran end to end in 46 s with real EasyOCR + yolov8n; the CI tests run the same flow with models off in about 3 s. **Acceptance 3** is covered by `test_rubric_is_switched_by_settings_only` and the model-card tests. **Acceptance 4**: `data/` and `*.pt` stay gitignored; only metrics go in `docs/eval/`. Acceptance 2 (real data) is not met.
+- **v1 vs v2, synthetic only** (6 videos: 3 human review, 3 human fail; COCO yolov8n, no custom model):
+
+  | | false-pass rate | review rate | status accuracy | false-fail rate |
+  |---|---|---|---|---|
+  | v1 (`docs/eval/synthetic-v1.md`) | 0 % | 50 % | 100 % | n/a (no human pass) |
+  | v2 (`docs/eval/synthetic-v2.md`) | 0 % | 33 % | 83 % | n/a |
+
+  v2 is lower on accuracy only because its extra checks need a custom model: one human-`review` video now scores below the review cutoff and is marked fail. **These numbers say nothing about real accuracy.** Calibration on the same data suggested `decision.review.min_score` 50 -> 60 for `return-v2` (cost 2 -> 0 on 4 videos); not applied, too few labels.
 
 ### 2026-10-01 — Phase 5 session
 - Baseline: 251 passed, **1 failed** (`test_jwt_secret_required_outside_dev`, caused by a developer `.env`); fixed in conftest → 252. Branch `phase-5-review-reports-admin`.
@@ -270,6 +310,13 @@ Phase 0 (all done):
 - Acceptance: (1) the CLI writes a schema-valid result and 4 evidence JPEGs ✔. (2) `test_yaml_threshold_change_changes_score` ✔. (3) `test_shipped_caps_block_pass` plus the pipeline dark/blur tests ✔. (4) suite 8 s; 60 s video 45 s ✔. (5) `/analyze` is covered by `test_api.py` (v1 shape). `app.py` was verified headless with Streamlit AppTest and a stubbed upload in both modes (no exceptions; titles and CSV columns come from the rubric) ✔.
 
 ## Handoff notes for next session
+
+**Phase 7 can start independently (nothing in it depends on trained models). To finish Phase 6 properly, someone needs to supply data** (see Known issues). State after Phase 6:
+- **To get real numbers:** (1) put videos in `data/samples/`; (2) after Phase 5 reviews exist, `python -m vms.cli export-eval --out data/eval/labels.csv`, or hand-write labels like `ml/eval_labels.example.csv` (step columns optional); (3) `python ml/evaluate.py --labels data/eval/labels.csv --rubric return-v1,forward-v1`; copy the `.md` into `docs/eval/`; (4) `python ml/extract_frames.py`, annotate per `ml/dataset/README.md`, `python ml/train.py`; (5) set `VMS_YOLO_WEIGHTS=data/models/vms-det-<date>.pt` and rerun the evaluation with `--rubric return-v2,forward-v2` (use `--from-cache` only for rubric-only changes); (6) `python ml/calibrate.py ...`, then copy the diff by hand into `*-v3.yaml`; (7) switch with `VMS_RUBRIC_FORWARD` / `VMS_RUBRIC_RETURN`. Recommended production ids: stay on `forward-v1` / `return-v1` until step 5 shows v2's false-pass rate <= v1's on real labels.
+- New files: `backend/vms/evaluation/*`, `backend/vms/analysis/detectors/model_card.py`, `rubrics/{forward,return}-v2.yaml`, `ml/{evaluate,calibrate,train,make_synthetic_eval}.py`, `ml/{data.yaml,eval_labels.example.csv,dataset/README.md}`, `docs/eval/synthetic-v{1,2}.md`. New settings (in `.env.example`): `VMS_YOLO_MODEL_CARD`, `VMS_YOLO_EVERY_N`, `VMS_TAG_CLOSE_UP_FRAC`, `VMS_RUBRIC_FORWARD`, `VMS_RUBRIC_RETURN`.
+- Adding a check key to any rubric: add plain wording to `vms/sop_doc.py::WHAT_IT_LOOKS_FOR` (a test requires it for v2) and a label in `frontend/src/lib/copy.ts::CHECK_LABEL`. Adding a metric: add it to `METRIC_KEYS` (the eval cache fingerprint includes the metric set, so old caches are re-run automatically).
+- Reanalyze uses the active rubric and weights at the time it runs; each result records `rubric_id` and `engine.detectors.objects`. A Phase 7 worker deployment needs the weights file and its `.model_card.json` together.
+- Windows heredoc gotcha in this environment: long Python/shell heredocs in the Bash tool sometimes fail to parse; write scripts to a file instead.
 
 **Start Phase 6 (ML training & evaluation).** State after Phase 5:
 - Human labels now exist: `reviews` (append-only; the latest per video wins) with `reason_code` (§7) and the judged `analysis_id`. Model-vs-human pairs: join `reviews` → `analyses` on `analysis_id` (`services/reports.load_rows` already computes `reviewed_status`). `false_negative_model` means the model was wrong and the operator was compliant, which makes it the best source of corrected labels for Phase 6.

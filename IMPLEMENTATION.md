@@ -198,6 +198,10 @@ Metric keys (the canonical list is `vms.analysis.metrics.METRIC_KEYS`; rubrics m
 | `max_label_hold_s` | Longest run of valid frames with label + text visible (OCR count carried forward) |
 | `quality_ok_ratio` | Valid frames / sampled frames (used by the low-quality cap) |
 | `frames_sampled` | Number of sampled frames |
+| `seal_visible_ratio` / `hand_with_product_ratio` / `tag_close_up_ratio` | Share of valid frames with a `seal` box / a `hand` box overlapping a `product` box / a `tag` box covering >= `VMS_TAG_CLOSE_UP_FRAC` of the frame. Need a custom model (Phase 6); 0 otherwise |
+| `label_and_barcode_ratio` | Share of valid frames where a label (heuristic or `label` box) and a decoded barcode are both present |
+
+**Detector roles and model cards (Phase 6).** YOLO class names map to roles (`product`, `package`, `label`, `barcode`, `tag`, `seal`, `hand`, `tool`) through `class_map` in `<weights>.model_card.json` (written by `ml/train.py`); without a card, `VMS_YOLO_CLASS_MAP` (COCO stopgap) applies. The active rubric per process type is `VMS_RUBRIC_FORWARD` / `VMS_RUBRIC_RETURN`; `engine.detectors.objects` (weights file) and `rubric_id` in each result record what produced it. Evaluation and calibration code is in `backend/vms/evaluation/`, driven by `ml/evaluate.py` and `ml/calibrate.py`.
 
 Evidence `image` paths are relative to `VMS_DATA_DIR` when the evidence dir is inside it, otherwise relative to the evidence dir itself. `image` is `null` when no evidence dir was given. Steps list their evidence signal kinds in the rubric (`evidence: [barcode, label]`); one entry per step that had a firing signal.
 
