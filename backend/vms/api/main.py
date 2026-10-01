@@ -5,7 +5,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from vms import __version__
 from vms.api.ratelimit import LoginLimiter
-from vms.api.routers import admin, auth, evidence, health, jobs, legacy, rubrics, stations, videos
+from vms.api.routers import (
+    admin,
+    auth,
+    evidence,
+    health,
+    jobs,
+    legacy,
+    reports,
+    review_queue,
+    rubrics,
+    stations,
+    videos,
+)
 from vms.api.views import API_PREFIX
 from vms.config import Settings, get_settings
 from vms.logging import configure_logging
@@ -26,7 +38,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         allow_headers=["*"],
         expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
     )
-    for module in (health, auth, videos, jobs, evidence, rubrics, stations, admin):
+    for module in (
+        health,
+        auth,
+        videos,
+        review_queue,
+        reports,
+        jobs,
+        evidence,
+        rubrics,
+        stations,
+        admin,
+    ):
         app.include_router(module.router, prefix=API_PREFIX)
     app.include_router(health.router, include_in_schema=False)  # legacy `/health`
     app.include_router(legacy.router)

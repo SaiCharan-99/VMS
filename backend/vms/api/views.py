@@ -5,18 +5,22 @@ from collections.abc import Sequence
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from vms.api.schemas import AnalysisBrief, AnalysisOut, EvidenceOut, VideoOut
-from vms.db.models import Analysis, User, Video
+from vms.api.schemas import AnalysisBrief, AnalysisOut, EvidenceOut, ReviewOut, VideoOut
+from vms.db.models import Analysis, Review, User, Video
 from vms.security import sign_media_url
 
 API_PREFIX = "/api/v1"
 
 
 def video_out(
-    video: Video, latest: Analysis | None = None, uploader: str | None = None
+    video: Video,
+    latest: Analysis | None = None,
+    uploader: str | None = None,
+    reviewed: bool = False,
 ) -> VideoOut:
     out = VideoOut.model_validate(video)
     out.uploaded_by_name = uploader
+    out.human_reviewed = reviewed
     out.stream_url = (
         sign_media_url(f"{API_PREFIX}/videos/{video.id}/stream") if video.storage_key else None
     )
@@ -25,7 +29,7 @@ def video_out(
 
 
 def video_outs(session: Session, videos: Sequence[Video]) -> list[VideoOut]:
-    """Videos with their latest analysis and uploader name, in two extra queries."""
+    """Videos with their latest analysis, uploader name, and review flag, in three queries."""
     ids = [v.id for v in videos]
     user_ids = {v.uploaded_by for v in videos if v.uploaded_by is not None}
     names: dict[int, str] = {}
@@ -38,7 +42,12 @@ def video_outs(session: Session, videos: Sequence[Video]) -> list[VideoOut]:
             select(Analysis).where(Analysis.video_id.in_(ids)).order_by(Analysis.id)
         ):
             latest[a.video_id] = a
-    return [video_out(v, latest.get(v.id), names.get(v.uploaded_by)) for v in videos]
+    reviewed: set[int] = set()
+    if ids:
+        reviewed = set(session.scalars(select(Review.video_id).where(Review.video_id.in_(ids))))
+    return [
+        video_out(v, latest.get(v.id), names.get(v.uploaded_by), v.id in reviewed) for v in videos
+    ]
 
 
 def analysis_out(analysis: Analysis) -> AnalysisOut:
@@ -58,3 +67,16 @@ def analysis_out(analysis: Analysis) -> AnalysisOut:
             for e in analysis.evidence
         ],
     )
+
+
+def review_outs(session: Session, reviews: Sequence[Review]) -> list[ReviewOut]:
+    ids = {r.reviewer_id for r in reviews}
+    names: dict[int, str] = {}
+    if ids:
+        names = dict(session.execute(select(User.id, User.name).where(User.id.in_(ids))).all())
+    out = []
+    for r in reviews:
+        item = ReviewOut.model_validate(r)
+        item.reviewer_name = names.get(r.reviewer_id)
+        out.append(item)
+    return out

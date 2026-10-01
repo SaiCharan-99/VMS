@@ -6,11 +6,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vms.api.deps import PageParams, admin_only, any_role, get_db, media_access, reviewer_up
-from vms.api.schemas import JobOut, Page, ReviewOut, UploadOut, VideoDetail, VideoOut
-from vms.api.views import analysis_out, video_outs
+from vms.api.schemas import JobOut, Page, ReviewIn, ReviewOut, UploadOut, VideoDetail, VideoOut
+from vms.api.views import analysis_out, review_outs, video_outs
 from vms.config import get_settings
 from vms.db.models import FinalStatus, ProcessType, Station, Video, VideoSource
-from vms.services import analyses, jobs
+from vms.services import analyses, jobs, reviews
 from vms.services import videos as video_svc
 from vms.services.principal import Principal
 from vms.storage import Storage, get_storage
@@ -116,7 +116,7 @@ def get_video(
     return VideoDetail(
         video=video_outs(db, [video])[0],
         analysis=analysis_out(latest) if latest else None,
-        reviews=[ReviewOut.model_validate(r) for r in video.reviews],
+        reviews=review_outs(db, video.reviews),
         job=JobOut.model_validate(job) if job else None,
     )
 
@@ -169,3 +169,22 @@ def delete_video(
     video_svc.soft_delete(db, _get_video(db, video_id, principal), principal)
     db.commit()
     return Response(status_code=204)
+
+
+@router.post("/{video_id}/reviews", status_code=201, response_model=ReviewOut)
+def review_video(
+    video_id: int,
+    body: ReviewIn,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(reviewer_up),
+) -> ReviewOut:
+    """Record a human pass/fail on the latest analysis. The latest review sets `final_status`."""
+    video = _get_video(db, video_id, principal)
+    try:
+        review = reviews.create(
+            db, video, principal, body.final_status, body.reason_code, body.comment
+        )
+    except reviews.ReviewError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.detail) from exc
+    db.commit()
+    return review_outs(db, [review])[0]

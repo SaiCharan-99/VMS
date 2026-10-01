@@ -1,7 +1,7 @@
 """Response models for /api/v1. Datetimes are UTC and serialized with a trailing `Z`."""
 
 from datetime import datetime
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Annotated, Any, Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
@@ -182,12 +182,21 @@ class VideoOut(_Orm):
     final_status: FinalStatus
     stream_url: str | None = None
     latest_analysis: AnalysisBrief | None = None
+    # True when a human review set `final_status` (the list "human override" badge).
+    human_reviewed: bool = False
+
+
+class ReviewIn(BaseModel):
+    final_status: ReviewStatus
+    reason_code: str = Field(min_length=1, max_length=32)
+    comment: str | None = Field(None, max_length=2000)
 
 
 class ReviewOut(_Orm):
     id: int
     analysis_id: int
     reviewer_id: int
+    reviewer_name: str | None = None
     final_status: ReviewStatus
     reason_code: str
     comment: str | None
@@ -226,3 +235,50 @@ class RubricOut(BaseModel):
     process_type: ProcessType
     title: str
     steps: list[RubricStepOut]
+
+
+class ReportTotals(BaseModel):
+    total: int
+    pass_: int = Field(alias="pass")
+    review: int
+    fail: int
+    pending: int
+
+    model_config = ConfigDict(populate_by_name=True, serialize_by_alias=True)
+
+
+class ReportGroup(ReportTotals):
+    key: str
+    label: str
+    pass_rate: float | None
+    avg_score: float | None
+
+
+class FailedCheck(BaseModel):
+    process_type: ProcessType
+    step_key: str
+    check_key: str
+    step_title: str
+    note: str | None
+    failures: int
+    evaluated: int
+    rate: float | None
+
+
+class ReportSummary(BaseModel):
+    """Rates are 0..1 (None when the denominator is 0). Definitions: `services.reports`."""
+
+    date_from: str
+    date_to: str
+    group_by: Literal["day", "station", "operator", "process_type"]
+    totals: ReportTotals
+    analyzed: int
+    pass_rate: float | None
+    review_rate: float | None
+    reviewed: int
+    agreement_rate: float | None
+    agreement_n: int
+    avg_score: float | None
+    avg_turnaround_s: float | None
+    top_failed_checks: list[FailedCheck]
+    groups: list[ReportGroup]
