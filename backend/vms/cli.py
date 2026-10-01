@@ -4,6 +4,7 @@ python -m vms.cli analyze <video> --process-type Return [--json out.json]
 python -m vms.cli import-legacy --db audit_results.db
 python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts for the password
 python -m vms.cli seed-demo                                         # dev only
+python -m vms.cli sop-doc --out docs/SOP.md                         # operator guide from rubrics
 """
 
 import argparse
@@ -80,6 +81,18 @@ def _seed_demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sop_doc(args: argparse.Namespace) -> int:
+    from vms.sop_doc import render
+
+    text = render()
+    if args.out:
+        args.out.write_text(text, encoding="utf-8", newline="\n")
+        print(f"Wrote {args.out}")
+    else:
+        sys.stdout.write(text)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vms.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -102,6 +115,10 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("seed-demo", help="Dev only: demo warehouse, stations, one user per role")
     p.set_defaults(func=_seed_demo)
+
+    p = sub.add_parser("sop-doc", help="Render the operator SOP guide from the rubric YAML")
+    p.add_argument("--out", type=Path, help="write here instead of stdout (docs/SOP.md)")
+    p.set_defaults(func=_sop_doc)
 
     args = parser.parse_args(argv)
     configure_logging()
