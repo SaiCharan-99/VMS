@@ -174,6 +174,7 @@ class VideoOut(_Orm):
     awb: str | None
     order_ref: str | None
     uploaded_by: int | None
+    uploaded_by_name: str | None = None
     station_id: int | None
     source: VideoSource
     duration_s: float | None

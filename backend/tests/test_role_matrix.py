@@ -47,6 +47,7 @@ MATRIX: dict[tuple[str, str], dict[str, object]] = {
     ("GET", "/api/v1/jobs/{job_id}"): ANY_OWNER,
     ("GET", "/api/v1/evidence/{evidence_id}"): ANY_OWNER,
     ("GET", "/api/v1/rubrics"): ANY,
+    ("GET", "/api/v1/stations"): ANY,
     ("GET", "/api/v1/admin/users"): ADMIN,
     ("POST", "/api/v1/admin/users"): ADMIN,
     ("PATCH", "/api/v1/admin/users/{user_id}"): ADMIN,

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from vms.api.deps import PageParams, admin_only, any_role, get_db, media_access, reviewer_up
 from vms.api.schemas import JobOut, Page, ReviewOut, UploadOut, VideoDetail, VideoOut
-from vms.api.views import analysis_out, video_out, video_outs
+from vms.api.views import analysis_out, video_outs
 from vms.config import get_settings
 from vms.db.models import FinalStatus, ProcessType, Station, Video, VideoSource
 from vms.services import analyses, jobs
@@ -70,9 +70,8 @@ def upload_video(
     db.commit()
     if outcome.duplicate:
         response.status_code = 200
-    latest = analyses.latest_analysis(db, outcome.video.id)
     return UploadOut(
-        video=video_out(outcome.video, latest),
+        video=video_outs(db, [outcome.video])[0],
         job=JobOut.model_validate(outcome.job) if outcome.job else None,
         duplicate=outcome.duplicate,
     )
@@ -115,7 +114,7 @@ def get_video(
     latest = analyses.latest_analysis(db, video.id)
     job = jobs.latest_job(db, video.id)
     return VideoDetail(
-        video=video_out(video, latest),
+        video=video_outs(db, [video])[0],
         analysis=analysis_out(latest) if latest else None,
         reviews=[ReviewOut.model_validate(r) for r in video.reviews],
         job=JobOut.model_validate(job) if job else None,

@@ -207,3 +207,11 @@ def test_openapi_lists_phase2_endpoints(client):
         "/results",
     ):
         assert p in paths, p
+
+
+def test_stations_and_uploader_name_for_any_user(client, qr_video):
+    body = _upload(client, qr_video).json()
+    assert body["video"]["uploaded_by_name"]
+    listed = client.get("/api/v1/videos").json()["items"][0]
+    assert listed["uploaded_by_name"] == body["video"]["uploaded_by_name"]
+    assert client.get("/api/v1/stations").json() == []
