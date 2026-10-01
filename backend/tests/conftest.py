@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 
 from vms import security
 from vms.analysis.detectors import get_ocr_reader, get_yolo
-from vms.config import get_settings
+from vms.config import Settings, get_settings
 from vms.db import create_all, get_engine, get_sessionmaker, session_scope
 from vms.db.models import Role, User
 from vms.services import api_keys, users
@@ -33,6 +33,8 @@ def isolated_settings(
     request: pytest.FixtureRequest, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
     """Keep tests off the real DB/data dir; disable heavy models unless marked `models`."""
+    # A developer's `.env` must not leak into tests (e.g. VMS_JWT_SECRET defeats the prod check).
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
     monkeypatch.setenv("VMS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("VMS_DB_URL", f"sqlite:///{(tmp_path / 'vms.db').as_posix()}")
     monkeypatch.setenv("VMS_ENV", "dev")
