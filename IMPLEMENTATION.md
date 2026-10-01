@@ -283,16 +283,16 @@ Review reason codes: `label_unclear`, `seal_not_shown`, `tags_not_shown`, `produ
 | `POST /auth/change-password` | any user | `{current_password, new_password}` → 204 |
 | `POST /videos` | operator+ / api key | multipart `file`, `process_type`, optional `awb`, `order_ref`, `station_id`. Streams to storage (no full read into memory). Size limit `VMS_MAX_UPLOAD_MB` (default 500). Dedupes on sha256 (returns the existing video with `duplicate: true`). → `201 {video, job}` |
 | `GET /videos` | operator+ | filters: `status, process_type, awb, q, station_id, uploaded_by, date_from, date_to`, paging, `sort`. Operators see only their own uploads, reviewers and admins see all. |
-| `GET /videos/{id}` | operator+ | video + latest analysis (full result) + reviews + job |
+| `GET /videos/{id}` | operator+ | video + latest analysis (full result) + reviews (with `reviewer_name`) + job. `VideoOut.human_reviewed` (Phase 5) flags a reviewer override in lists |
 | `GET /videos/{id}/stream` | operator+, or a signed URL | HTTP Range support for the `<video>` player. `stream_url` in responses is signed (`?exp=&sig=`, HMAC with the JWT secret, `VMS_MEDIA_URL_TTL_S`, default 6 h) so media tags work without headers |
 | `POST /videos/{id}/reanalyze` | reviewer+ | new job (for example after a rubric or model upgrade) |
 | `DELETE /videos/{id}` | admin | soft delete + audit_log |
 | `GET /jobs/{id}` | operator+ | `{status, progress, error}` |
 | `GET /evidence/{id}` | operator+, or a signed URL | JPEG; evidence `url`s are signed like `stream_url` |
-| `GET /review-queue` | reviewer+ | videos with `final_status=review`, oldest first |
-| `POST /videos/{id}/reviews` | reviewer+ | `{final_status, reason_code, comment}` |
-| `GET /reports/summary` | reviewer+ | `date_from,date_to,group_by=day|station|operator|process_type` → counts, pass rate, avg score, top failed checks |
-| `GET /reports/export.csv` | reviewer+ | same filters as `GET /videos` |
+| `GET /review-queue` | reviewer+ | videos with `final_status=review`, oldest first; filters `process_type, station_id`; paginated `Page[VideoOut]` |
+| `POST /videos/{id}/reviews` | reviewer+ (users only) | `{final_status: pass|fail, reason_code, comment}` → 201 `ReviewOut`. Judges the latest analysis; 409 if none. `comment` required (422) for `other` or when overturning a model `pass`/`fail`. Append-only; latest wins (`videos.final_status`); audit `review.created` |
+| `GET /reports/summary` | reviewer+ | `date_from, date_to` (local dates, default last 7 days, max 1 year), `group_by=day|station|operator|process_type`, `process_type, station_id, tz_offset_min` (minutes east of UTC) → totals by final status, `analyzed`, `pass_rate`, `review_rate`, `reviewed`, `agreement_rate` + `agreement_n`, `avg_score`, `avg_turnaround_s`, `top_failed_checks[10]`, `groups[]` (day groups are gap-filled). Definitions in `services/reports.py` `summarize()` |
+| `GET /reports/export.csv` | reviewer+ | same filters as `GET /videos` + `tz_offset_min`; streamed UTF-8 **with BOM**, oldest first. Columns: the Streamlit CSV (Timestamp, File, Process Type, Verdict, Manual Summary, Score %, `<step title> %` for every active rubric step, Sides, Duration (s), Follow-up Notes) + AWB, Station, Operator, Final Status, Reviewer, Review Reason, Review Comment |
 | `GET/POST /admin/users`, `PATCH /admin/users/{id}` | admin | PATCH: `name, role, warehouse_id, is_active, password` (only sent fields). Admins can't demote/deactivate themselves. |
 | `GET/POST /admin/stations`, `/admin/warehouses` | admin | |
 | `GET/POST /admin/api-keys`, `DELETE /admin/api-keys/{id}` | admin | the key is shown once on creation; DELETE revokes |

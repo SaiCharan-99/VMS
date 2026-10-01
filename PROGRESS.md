@@ -2,7 +2,7 @@
 
 > **Every session:** read this after CLAUDE.md. **Before ending a session:** update the status table, tick tasks, add a session log entry, record decisions and known issues, and write handoff notes. The next session has no other memory.
 
-## Current phase: **Phase 5 — Review workflow, reports, admin** (not started; Phase 4 done)
+## Current phase: **Phase 6 — ML training & evaluation** (not started; Phase 5 done)
 
 ## Phase status
 
@@ -14,8 +14,8 @@
 | 2 | Data layer, jobs, API v1 | [PHASE_2](docs/phases/PHASE_2_data_jobs_api.md) | ✅ done | `phase-2-data-jobs-api` | 2026-10-01 |
 | 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ✅ done | `phase-3-auth-users` | 2026-10-01 |
 | 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ✅ done | `phase-4-frontend` | 2026-10-01 |
-| 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⏳ next | `phase-5-review-reports-admin` | |
-| 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⬜ | `phase-6-ml` | |
+| 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⚠️ done (PDF report skipped) | `phase-5-review-reports-admin` | 2026-10-01 |
+| 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⏳ next | `phase-6-ml` | |
 | 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ⬜ | `phase-7-production` | |
 
 Legend: ⬜ not started · ⏳ next / in progress · ✅ done · ⚠️ done with caveats (see Known issues)
@@ -31,6 +31,22 @@ Dependencies: 0 → 1 → 2 → 3 → 4 → 5. Phase 6 needs 1 and 2 (it's bette
 ## Current-phase task checklist
 
 Copy the task list from the current phase doc here at session start, and tick items as you go.
+
+Phase 5 (done except the stretch PDF):
+- [x] `services/reviews.py`: pass/fail + reason code (§7 list) + comment; comment required for `other` or when overturning a model pass/fail; append-only, latest wins via `refresh_final_status`; audit `review.created` (model status, decision, reason, comment)
+- [x] `GET /review-queue` (oldest first, `process_type`/`station_id`), `POST /videos/{id}/reviews`; `GET /videos/{id}` reviews carry `reviewer_name`; `VideoOut.human_reviewed`
+- [x] `services/reports.py` + `GET /reports/summary` (totals, pass rate, review rate, agreement, avg score, avg turnaround, top failed checks from `result_json`, groups by day/station/operator/process_type; tz-aware local days)
+- [x] `GET /reports/export.csv`: Streamlit columns + AWB, Station, Operator, Final Status, Reviewer, Review Reason, Review Comment; UTF-8 BOM; streamed in 500-video batches on its own session
+- [ ] `GET /videos/{id}/report.pdf`: **skipped (stretch goal)**; no PDF library added
+- [x] Backend tests: `test_reviews.py` (13), `test_reports.py` (8, hand-calculated fixture `tests/report_fixture.py`), `test_sop_doc.py` (2), role matrix +4 routes. Suite **295 passed**
+- [x] `/review`: queue list + focused `InspectionView` + sticky `ReviewBar`; keys 1–7 reason, P/F decide, N next, J/K ±5 s, Esc leaves a field; optimistic advance with rollback on error; nav badge with the queue size
+- [x] Review history on `/videos/:id` (`ReviewHistory`); human-override icon in lists (`StatusBadge human`)
+- [x] `/reports`: 7/30/90/custom range, type + station filters, 4 KPI tiles, stacked status-per-day chart (Recharts) + table view, top failed checks, station/operator breakdown, CSV export (also on Inspections for reviewer+)
+- [x] Dashboard (reviewer+): from `/reports/summary`: today's count, pass rate + 7-day sparkline, awaiting review, agreement; 7-day outcome chart; most-missed checks. Operators keep the list-count tiles
+- [x] `/admin`: tabs Users (create; edit role/warehouse/active; reset password), Warehouses & Stations (create), API keys (create → shown once + copy; revoke with confirm), Audit log (action prefix, entity id, dates, paging)
+- [x] `docs/SOP.md` generated from the rubric YAML (`python -m vms.cli sop-doc --out docs/SOP.md`; a test fails when it's stale)
+- [x] Frontend tests: `phase5.test.tsx` (8: keyboard review flow, reason/comment guards, empty queue, history, reports, admin create user, tab keys). 26 frontend tests total
+- [x] Acceptance 1–6 verified (see session log)
 
 Phase 4 (all done):
 - [x] Scaffold `frontend/`: Vite 6 + React 18 + TS strict, Tailwind 3, React Router 6, TanStack Query 5, zod, ESLint 9 (+jsx-a11y) + Prettier, Vitest + Testing Library + MSW. Proxy `/api` → :8000
@@ -155,6 +171,19 @@ Phase 0 (all done):
 | 2026-10-01 | 4 | Not built yet (Phase 5): Review queue / Reports / Admin nav items, charts, Export CSV, Download report, station filter on Inspections. Dashboard tile 4 is "Analyzing now" instead of model–reviewer agreement. Table thumbnails are a placeholder icon. | Out of scope or no backend yet. |
 | 2026-10-01 | 4 | Dashboard counts use `GET /videos?page_size=1` totals (one call per status) | No summary endpoint until `/reports/summary` (Phase 5). |
 | 2026-10-01 | 4 | Coincident evidence markers fan out 16px apart | Synthetic videos put every step's evidence at the same second. |
+| 2026-10-01 | 5 | Branched `phase-5-review-reports-admin` from `phase-4-frontend` | Earlier phases still aren't merged into `main`. |
+| 2026-10-01 | 5 | Tests ignore the developer `.env` (`Settings.model_config["env_file"] = None` in conftest) | Baseline was red: a local `VMS_JWT_SECRET` in `.env` defeated `test_jwt_secret_required_outside_dev`. |
+| 2026-10-01 | 5 | Report aggregation runs in Python over one row per video (no `analysis_checks` table, no JSON SQL) | Same code on SQLite and Postgres; volumes are small. Revisit (precomputed table) if ranges reach ~100k videos. |
+| 2026-10-01 | 5 | KPI definitions: pass_rate = final pass / analyzed (final ≠ pending); review_rate = latest *model* status review / analyzed; agreement = over reviewed videos whose *judged* analysis said pass/fail, the share where the human matched (model `review` is excluded because it abstained); turnaround = upload → latest review, or → analysis when the model settled it, over final pass/fail | Documented in `reports.summarize()` and IMPLEMENTATION.md §8. |
+| 2026-10-01 | 5 | Days are the user's local days: `tz_offset_min` on `/reports/*` (the frontend sends `-getTimezoneOffset()`). The reviewer dashboard uses `/reports/summary` | Fixes the Phase 4 "today vs UTC" issue for reviewers and admins. |
+| 2026-10-01 | 5 | The review comment rule is enforced server-side (422) and mirrored in the UI. Reviews need a user (API keys can't review) | Every overturn of the model is explained in the audit trail. |
+| 2026-10-01 | 5 | Review keyboard: digits 1–7 pick the reason (order of the §7 list), P/F decide, N next, J/K seek, Esc leaves a field. Shortcuts are ignored while a field has focus | Without reason keys, a keyboard-only reviewer would have to tab into the select every time. |
+| 2026-10-01 | 5 | Optimistic advance: the item leaves the queue cache at once; on an API error it's restored and re-selected with the draft and the message | Phase doc "optimistic advance". |
+| 2026-10-01 | 5 | Charts: Recharts 2, colours resolved from CSS tokens at runtime (`useTokens`, re-read on theme change). Status series use the reserved status tokens. The dataviz validator FAILS light review vs fail for CVD (ΔE 2.4), so review segments are **hatched**, with a legend, 2px surface gaps, tooltips, and "View as table". Top failed checks are accent HTML bars (long labels) | Status colours are reserved and can't be re-stepped; secondary encoding is the dataviz-skill remedy. |
+| 2026-10-01 | 5 | Extracted `InspectionView` (player + timeline + verdict + steps), shared by the detail and review pages. New primitives `Tabs` (+ `Field`); `KpiTile` takes children (sparkline); the `VideoPlayer` handle gained `skip(dt)`, and the player stops Space/J/K from propagating | Reuse instead of duplicating the detail page. |
+| 2026-10-01 | 5 | Toasts moved from bottom-right to top-right under the header | They covered the sticky ReviewBar's Fail/Pass buttons during rapid reviewing. |
+| 2026-10-01 | 5 | `docs/SOP.md` is generated (`vms/sop_doc.py`). Plain wording per check lives in `WHAT_IT_LOOKS_FOR`; thresholds and fail notes come from the YAML | Keeps the operator guide in sync with rubric versions; a test enforces it. |
+| 2026-10-01 | 5 | PDF report (`/videos/{id}/report.pdf`) **not built** | Stretch goal; it would add reportlab/weasyprint. The detail page has no "Download report" button yet. |
 
 ## Open questions for the user (from IMPLEMENTATION.md §11)
 
@@ -166,7 +195,14 @@ Phase 0 (all done):
 
 ## Known issues / tech debt
 
-- Phase 4: dashboard "today" uses the browser's local date, but the API compares it to UTC `created_at`, so around midnight (IST 00:00–05:30) counts can be off. Fix in Phase 5 with a tz-aware `/reports/summary`.
+- Phase 4: dashboard "today" uses the browser's local date, but the API compares it to UTC `created_at`. **Fixed in Phase 5 for reviewers and admins** (tz-aware `/reports/summary`). The operator tiles still use `GET /videos?date_from=` (UTC), so operators can still see counts off by a few hours around midnight. `GET /videos` could accept `tz_offset_min` too.
+- Phase 5: the production JS bundle is ~820 kB (Recharts). Lazy-load `/reports`, `/review`, `/admin` (and the dashboard charts) in Phase 7.
+- Phase 5: `/reports/summary` loads every video in the range into memory (max range 1 year). Fine for current volumes; precompute per-check rows if it gets slow.
+- Phase 5: the review page loads at most 100 queue items (`page_size=100`); the header shows the true total.
+- Phase 5: station/warehouse **edit/delete** still don't exist (admins can only create). Users can't be deleted, only deactivated (by design).
+- Phase 5: no PDF report (stretch goal skipped).
+- Phase 5: jsdom has no `HTMLDialogElement.showModal`, so dialog tests query with `hidden: true`.
+- Phase 5: the CSV's Excel compatibility is asserted by tests (BOM, columns) but wasn't opened in a real Excel (none on the dev machine).
 - Phase 4: signed media URLs expire after `VMS_MEDIA_URL_TTL_S`; a page left open longer needs a reload to keep streaming.
 - Phase 4: TS types are hand-maintained (`frontend/src/types/*.ts` mirror `schemas.py` and `result.py`). Consider openapi-typescript in Phase 7.
 - Phase 4: the `/_ui` gallery chunk is still emitted in production builds (the route itself is dev-only).
@@ -189,6 +225,14 @@ Phase 0 (all done):
 - Stale jobs are re-queued at the start of each worker loop iteration, so nothing reaps them while every worker is busy.
 
 ## Session log
+
+### 2026-10-01 — Phase 5 session
+- Baseline: 251 passed, **1 failed** (`test_jwt_secret_required_outside_dev`, caused by a developer `.env`); fixed in conftest → 252. Branch `phase-5-review-reports-admin`.
+- Backend now **295 passed**; ruff check/format clean. Frontend: typecheck, lint (0 warnings), 26 tests, and build all green.
+- **Acceptance 2** (report math): `test_reports.py::test_summary_matches_hand_calculation` asserts every KPI, the top failed checks, and gap-filled day groups against the table in `tests/report_fixture.py`. Other tests cover station/operator groups, filters, a UTC+12 day shift, and the CSV.
+- **Acceptance 3** (CSV): BOM and review columns asserted in `test_csv_export`. Not opened in a real Excel.
+- **Live check** (built-in browser; scratch DB and data dir in the session scratchpad, API on :8001, Vite `--mode scratch` on :5174, because port 8000 was taken by another local python process, which was left alone): seeded 14 synthetic H.264 videos (MSMF), 12 in the review queue. As `reviewer@vms.local`, cleared **11 videos using only the keyboard** (reason digit + P/F, auto-advancing each time). DB check: 11 reviews, each video's final status matches, and each has a `review.created` audit row with the reviewer id and reason (**acceptance 1**). The Reports page matched a hand count (6/14 pass = 42.9%, 12/14 model review = 85.7%, agreement "—" because every reviewed verdict was a model `review`). As admin, created a new operator in Admin → Users, logged in as them (operator-only nav), and uploaded through `/upload` → "Queued for analysis" (**acceptance 4**).
+- **Acceptance 6**: no raw hex in the new screens (colours via tokens; charts read tokens at runtime), and only `components/ui` primitives (plus the new `Tabs`/`Field`). `scrollWidth == innerWidth` on dashboard, review, reports, and admin (users/audit/keys) at 375 px; desktop checked in light and dark; no console errors. Found and fixed: toasts covering the ReviewBar, and an empty sparkline with only one data point.
 
 ### 2026-10-01 — Phase 4 session
 - Baseline 244 passed. Branch `phase-4-frontend`. Backend now 252 passed; ruff clean.
@@ -226,6 +270,17 @@ Phase 0 (all done):
 - Acceptance: (1) the CLI writes a schema-valid result and 4 evidence JPEGs ✔. (2) `test_yaml_threshold_change_changes_score` ✔. (3) `test_shipped_caps_block_pass` plus the pipeline dark/blur tests ✔. (4) suite 8 s; 60 s video 45 s ✔. (5) `/analyze` is covered by `test_api.py` (v1 shape). `app.py` was verified headless with Streamlit AppTest and a stubbed upload in both modes (no exceptions; titles and CSV columns come from the rubric) ✔.
 
 ## Handoff notes for next session
+
+**Start Phase 6 (ML training & evaluation).** State after Phase 5:
+- Human labels now exist: `reviews` (append-only; the latest per video wins) with `reason_code` (§7) and the judged `analysis_id`. Model-vs-human pairs: join `reviews` → `analyses` on `analysis_id` (`services/reports.load_rows` already computes `reviewed_status`). `false_negative_model` means the model was wrong and the operator was compliant, which makes it the best source of corrected labels for Phase 6.
+- **Numbers the phase doc asked for:** there is still **no real data** (`data/samples/` is empty, `audit_results.db` has 0 rows), so there is no meaningful agreement rate or most-failed-check ranking yet. Synthetic videos fail almost every check, which says nothing. Once real reviews exist, read `agreement_rate`/`agreement_n` and `top_failed_checks` from `GET /reports/summary` (or the Reports page) and prioritise from those.
+- Reports API: `/reports/summary` (+`group_by`) and `/reports/export.csv` (same filters as `/videos`), both reviewer+, both take `tz_offset_min`. The CSV is a convenient eval-set export (per-step % + human decision + reason).
+- Operator guide: `docs/SOP.md` is generated. After any rubric change (e.g. `forward-v2`), add plain wording for new check keys in `vms/sop_doc.py::WHAT_IT_LOOKS_FOR` and rerun `python -m vms.cli sop-doc --out docs/SOP.md` (a test fails otherwise). Frontend check labels live in `frontend/src/lib/copy.ts::CHECK_LABEL`.
+- Frontend map additions: `src/pages/{ReviewPage,ReportsPage,AdminPage}.tsx`, `src/pages/admin/*Tab.tsx`, `src/components/inspection/InspectionView.tsx`, `src/components/review/{ReviewBar,ReviewHistory}.tsx`, `src/components/charts/{StatusByDayChart,Sparkline,FailedChecksList,useTokens}`, `src/lib/{review,tabs}.ts`, `src/components/ui/Tabs.tsx`.
+- New routes must go into `MATRIX` in `backend/tests/test_role_matrix.py`.
+- Live-testing tips: synthetic H.264 videos need `cv2.VideoWriter(path, cv2.CAP_MSMF, fourcc("avc1"), ...)` on Windows (the FFmpeg backend's openh264 fails). If port 8000 is busy, run the API on another port and start Vite with `VITE_API_URL` set (a gitignored `frontend/.env.<mode>.local` plus `--mode <mode>`).
+
+### Phase 4 handoff (kept for reference)
 
 **Start Phase 5 (review workflow, reports, admin).** State after Phase 4:
 - Run: API (`uvicorn vms.api.main:app --reload --port 8000`), worker (`python -m vms.worker`), web (`cd frontend; npm run dev`, or `preview_start web` from `.claude/launch.json`). Demo logins are in the Phase 3 handoff below. `.env` needs `VMS_JWT_SECRET`.
