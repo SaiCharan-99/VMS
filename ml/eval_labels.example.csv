@@ -1,0 +1,7 @@
+video_path,process_type,expected_status,shipping_label,unboxing,tags,product,notes
+data/eval/synthetic/qr_text_moving.mp4,Return,review,met,missed,missed,missed,barcode + text only; no tags or product
+data/eval/synthetic/qr_plain.mp4,Return,review,partial,missed,missed,missed,barcode only
+data/eval/synthetic/text_only.mp4,Forward,review,missed,missed,missed,missed,no barcode (capped at review)
+data/eval/synthetic/dark.mp4,Return,fail,missed,missed,missed,missed,unusable lighting
+data/eval/synthetic/blurred.mp4,Forward,fail,missed,missed,missed,missed,unusable focus
+data/eval/synthetic/too_short.mp4,Return,fail,partial,missed,missed,missed,one second long

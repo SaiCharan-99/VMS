@@ -1,0 +1,21 @@
+# YOLO dataset template. Copy to data/yolo/data.yaml, or point ml/train.py --data at your export.
+# Folder layout (CVAT / Roboflow "YOLO" export):
+#   data/yolo/images/{train,val}/*.jpg   data/yolo/labels/{train,val}/*.txt
+# Split by VIDEO, not by frame: frames of one video must not appear in both train and val.
+path: data/yolo
+train: images/train
+val: images/val
+
+# Keep this order: the ids are baked into the exported labels. Class -> role is in
+# backend/vms/analysis/detectors/model_card.py (DEFAULT_CLASS_ROLES).
+names:
+  0: shipping_label
+  1: barcode
+  2: brand_tag
+  3: hangtag
+  4: product
+  5: package_box
+  6: package_polybag
+  7: seal_tape
+  8: hand
+  9: scissors_cutter

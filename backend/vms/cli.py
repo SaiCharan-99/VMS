@@ -5,6 +5,7 @@ python -m vms.cli import-legacy --db audit_results.db
 python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts for the password
 python -m vms.cli seed-demo                                         # dev only
 python -m vms.cli sop-doc --out docs/SOP.md                         # operator guide from rubrics
+python -m vms.cli export-eval --out data/eval/labels.csv            # human reviews -> eval labels
 """
 
 import argparse
@@ -93,6 +94,18 @@ def _sop_doc(args: argparse.Namespace) -> int:
     return 0
 
 
+def _export_eval(args: argparse.Namespace) -> int:
+    from vms.db import session_scope
+    from vms.evaluation.export import export_reviewed
+    from vms.evaluation.labels import write_labels
+
+    with session_scope() as session:
+        rows, skipped = export_reviewed(session)
+    write_labels(args.out, rows)
+    print(f"Wrote {len(rows)} labelled videos to {args.out} ({skipped} skipped: file missing).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vms.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -119,6 +132,10 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("sop-doc", help="Render the operator SOP guide from the rubric YAML")
     p.add_argument("--out", type=Path, help="write here instead of stdout (docs/SOP.md)")
     p.set_defaults(func=_sop_doc)
+
+    p = sub.add_parser("export-eval", help="Write human-reviewed videos as an eval labels CSV")
+    p.add_argument("--out", type=Path, default=Path("data/eval/labels.csv"))
+    p.set_defaults(func=_export_eval)
 
     args = parser.parse_args(argv)
     configure_logging()
