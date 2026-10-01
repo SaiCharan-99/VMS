@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Annotated, Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, PlainSerializer
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
 from vms.analysis.result import AnalysisResult
 from vms.db.models import FinalStatus, JobStatus, ProcessType, ReviewStatus, Role, VideoSource
@@ -30,6 +30,97 @@ class UserOut(_Orm):
     email: str
     name: str
     role: Role
+    warehouse_id: int | None
+    is_active: bool
+    created_at: UtcDateTime
+    last_login_at: UtcDateTime | None
+
+
+class LoginIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=1, max_length=256)
+
+
+class TokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserOut
+
+
+class ChangePasswordIn(BaseModel):
+    current_password: str = Field(max_length=256)
+    new_password: str = Field(max_length=256)
+
+
+class UserCreate(BaseModel):
+    email: str = Field(min_length=3, max_length=320, pattern=r"^[^@\s]+@[^@\s]+$")
+    name: str = Field(min_length=1, max_length=200)
+    password: str = Field(max_length=256)
+    role: Role
+    warehouse_id: int | None = None
+
+
+class UserUpdate(BaseModel):
+    """Only the fields sent are changed. `warehouse_id: null` clears it; `password` resets it."""
+
+    name: str | None = Field(None, min_length=1, max_length=200)
+    role: Role | None = None
+    warehouse_id: int | None = None
+    is_active: bool | None = None
+    password: str | None = Field(None, max_length=256)
+
+
+class WarehouseIn(BaseModel):
+    code: str = Field(min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=200)
+
+
+class WarehouseOut(_Orm):
+    id: int
+    code: str
+    name: str
+    created_at: UtcDateTime
+
+
+class StationIn(BaseModel):
+    warehouse_id: int
+    code: str = Field(min_length=1, max_length=32)
+    name: str = Field(min_length=1, max_length=200)
+
+
+class StationOut(_Orm):
+    id: int
+    warehouse_id: int
+    code: str
+    name: str
+
+
+class ApiKeyIn(BaseModel):
+    name: str = Field(min_length=1, max_length=200)
+
+
+class ApiKeyOut(_Orm):
+    id: int
+    name: str
+    created_by: int
+    created_at: UtcDateTime
+    revoked_at: UtcDateTime | None
+
+
+class ApiKeyCreated(ApiKeyOut):
+    key: str = Field(description="The plaintext key. Shown only once; store it now.")
+
+
+class AuditLogOut(_Orm):
+    id: int
+    actor_user_id: int | None
+    actor_api_key_id: int | None
+    action: str
+    entity_type: str
+    entity_id: str | None
+    data: dict[str, Any] | None
+    created_at: UtcDateTime
 
 
 class JobOut(_Orm):

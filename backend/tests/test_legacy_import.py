@@ -27,7 +27,7 @@ def _legacy_db(path):
     conn.close()
 
 
-def test_import_is_idempotent(client, tmp_path):
+def test_import_is_idempotent(client, api_client, tmp_path):
     db = tmp_path / "audit_results.db"
     _legacy_db(db)
     with session_scope() as s:
@@ -50,5 +50,5 @@ def test_import_is_idempotent(client, tmp_path):
     assert detail["analysis"]["result"]["detected_barcode"] == "AWB-9"
     assert client.post(f"/api/v1/videos/{a['id']}/reanalyze").status_code == 409
 
-    rows = client.get("/results").json()["results"]
-    assert {r["file_name"] for r in rows} == {"a.mp4", "b.mp4"}
+    # `/results` is scoped to the calling API key's uploads, so imported rows aren't listed.
+    assert api_client.get("/results").json()["results"] == []

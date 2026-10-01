@@ -2,9 +2,12 @@
 
 python -m vms.cli analyze <video> --process-type Return [--json out.json]
 python -m vms.cli import-legacy --db audit_results.db
+python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts for the password
+python -m vms.cli seed-demo                                         # dev only
 """
 
 import argparse
+import getpass
 import sys
 import uuid
 from pathlib import Path
@@ -41,6 +44,42 @@ def _import_legacy(args: argparse.Namespace) -> int:
     return 0
 
 
+def _create_admin(args: argparse.Namespace) -> int:
+    from vms.db import session_scope
+    from vms.db.models import Role
+    from vms.services import users
+
+    password = getpass.getpass("Password: ")
+    if password != getpass.getpass("Repeat password: "):
+        print("Passwords do not match.", file=sys.stderr)
+        return 1
+    try:
+        with session_scope() as session:
+            user = users.create(
+                session, email=args.email, name=args.name, password=password, role=Role.admin
+            )
+            print(f"Created admin {user.email} (id {user.id}).")
+    except users.UserError as exc:
+        print(exc.detail, file=sys.stderr)
+        return 1
+    return 0
+
+
+def _seed_demo(args: argparse.Namespace) -> int:
+    from vms.db import session_scope
+    from vms.services.demo import DEMO_USERS, seed_demo
+
+    if get_settings().env != "dev":
+        print("seed-demo only runs with VMS_ENV=dev.", file=sys.stderr)
+        return 1
+    with session_scope() as session:
+        created = seed_demo(session)
+    print(f"Demo data ready ({created} new users). Dev-only logins:")
+    for email, _name, role, password in DEMO_USERS:
+        print(f"  {role.value:<9} {email:<22} {password}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vms.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -55,6 +94,14 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("import-legacy", help="Import the pre-Phase-2 audit_results.db")
     p.add_argument("--db", type=Path, default=Path("audit_results.db"))
     p.set_defaults(func=_import_legacy)
+
+    p = sub.add_parser("create-admin", help="Create an admin user (prompts for the password)")
+    p.add_argument("--email", required=True)
+    p.add_argument("--name", required=True)
+    p.set_defaults(func=_create_admin)
+
+    p = sub.add_parser("seed-demo", help="Dev only: demo warehouse, stations, one user per role")
+    p.set_defaults(func=_seed_demo)
 
     args = parser.parse_args(argv)
     configure_logging()

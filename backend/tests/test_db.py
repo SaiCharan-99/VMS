@@ -22,6 +22,8 @@ def test_alembic_upgrade_head_matches_models(tmp_path):
     try:
         tables = set(inspect(engine).get_table_names()) - {"alembic_version"}
         assert tables == set(Base.metadata.tables)
+        video_cols = {c["name"] for c in inspect(engine).get_columns("videos")}
+        assert "api_key_id" in video_cols  # 0002
         with Session(engine) as s:
             system = s.scalar(select(User).where(User.email == SYSTEM_USER_EMAIL))
             assert system is not None and system.role == Role.admin

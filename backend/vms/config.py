@@ -38,6 +38,12 @@ class Settings(BaseSettings):
     # A running job whose heartbeat is older than this is assumed lost and re-queued.
     job_stale_s: int = 300
     job_max_attempts: int = 3
+    # "dev" auto-generates a JWT secret when none is set; any other env requires VMS_JWT_SECRET.
+    env: str = "dev"
+    jwt_secret: str | None = None
+    jwt_ttl_hours: int = 12
+    login_max_failures: int = 10
+    login_window_s: int = 900
 
 
 @lru_cache

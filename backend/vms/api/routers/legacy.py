@@ -8,11 +8,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from vms.analysis.result import SCHEMA_VERSION, AnalysisResult
-from vms.api.deps import get_current_user, get_db
+from vms.api.deps import get_db, require_api_key
 from vms.config import get_settings
-from vms.db.models import Analysis, Job, JobStatus, ProcessType, User, Video, VideoSource, utcnow
+from vms.db.models import Analysis, Job, JobStatus, ProcessType, Video, VideoSource, utcnow
 from vms.services import analyses
 from vms.services import videos as video_svc
+from vms.services.principal import Principal
 from vms.storage import Storage, get_storage
 from vms.worker import run_job
 
@@ -31,7 +32,7 @@ def analyze(
     process_type: str = Form("Return"),
     db: Session = Depends(get_db),
     storage: Storage = Depends(get_storage),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(require_api_key),
 ) -> dict:
     """Analyze synchronously and return the v1 result. Stored in the new tables like any upload."""
     if process_type not in ProcessType.__members__:
@@ -44,7 +45,7 @@ def analyze(
             file.file,
             file.filename or "",
             ProcessType(process_type),
-            user=user,
+            actor=principal,
             source=VideoSource.api,
             max_bytes=settings.max_upload_mb * 1024 * 1024,
             content_type=file.content_type,
@@ -77,11 +78,17 @@ def analyze(
 
 
 @router.get("/results", deprecated=True)
-def list_results(limit: int = 20, db: Session = Depends(get_db)) -> dict:
-    """Latest analyses in the old `results` row shape (`id` is the analysis id)."""
+def list_results(
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(require_api_key),
+) -> dict:
+    """Latest analyses of this key's uploads in the old `results` row shape
+    (`id` is the analysis id)."""
     rows = db.execute(
         select(Analysis, Video)
         .join(Video, Video.id == Analysis.video_id)
+        .where(principal.video_filter(), Video.deleted_at.is_(None))
         .order_by(Analysis.id.desc())
         .limit(max(1, min(limit, 100)))
     ).all()

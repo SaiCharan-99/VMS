@@ -12,14 +12,13 @@ from vms.db.models import (
     FinalStatus,
     Job,
     ProcessType,
-    Role,
-    User,
     Video,
     VideoSource,
     new_uuid,
     utcnow,
 )
 from vms.services import audit, jobs
+from vms.services.principal import Principal
 from vms.storage import Storage, TooLargeError
 
 ALLOWED_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".wmv"}
@@ -59,7 +58,7 @@ def create_from_upload(
     filename: str,
     process_type: ProcessType,
     *,
-    user: User | None,
+    actor: Principal | None,
     source: VideoSource,
     max_bytes: int,
     content_type: str | None = None,
@@ -112,7 +111,8 @@ def create_from_upload(
         process_type=process_type,
         awb=awb or None,
         order_ref=order_ref or None,
-        uploaded_by=user.id if user else None,
+        uploaded_by=actor.user.id if actor and actor.user else None,
+        api_key_id=actor.api_key.id if actor and actor.api_key else None,
         station_id=station_id,
         source=source,
         duration_s=duration or None,
@@ -127,7 +127,7 @@ def create_from_upload(
         "video",
         video.id,
         {"filename": name, "sha256": sha256, "size_bytes": size, "source": source.value},
-        actor_user_id=user.id if user else None,
+        **(actor.actor if actor else {}),
     )
     return UploadOutcome(video, job, duplicate=False)
 
@@ -154,10 +154,8 @@ SORTS = {
 }
 
 
-def list_query(filters: VideoFilters, user: User, sort: str = "-created_at") -> Select:
-    stmt = select(Video).where(Video.deleted_at.is_(None))
-    if user.role == Role.operator:
-        stmt = stmt.where(Video.uploaded_by == user.id)
+def list_query(filters: VideoFilters, principal: Principal, sort: str = "-created_at") -> Select:
+    stmt = select(Video).where(Video.deleted_at.is_(None), principal.video_filter())
     if filters.status:
         stmt = stmt.where(Video.final_status == filters.status)
     if filters.process_type:
@@ -189,14 +187,12 @@ def list_query(filters: VideoFilters, user: User, sort: str = "-created_at") -> 
     return stmt.order_by(SORTS[sort], Video.id.desc())
 
 
-def soft_delete(session: Session, video: Video, user: User) -> None:
+def soft_delete(session: Session, video: Video, actor: Principal) -> None:
     video.deleted_at = utcnow()
-    audit.log(session, "video.deleted", "video", video.id, actor_user_id=user.id)
+    audit.log(session, "video.deleted", "video", video.id, **actor.actor)
 
 
-def reanalyze(session: Session, video: Video, user: User, max_attempts: int = 3) -> Job:
+def reanalyze(session: Session, video: Video, actor: Principal, max_attempts: int = 3) -> Job:
     job = jobs.enqueue(session, video, max_attempts)
-    audit.log(
-        session, "video.reanalyze", "video", video.id, {"job_id": job.id}, actor_user_id=user.id
-    )
+    audit.log(session, "video.reanalyze", "video", video.id, {"job_id": job.id}, **actor.actor)
     return job

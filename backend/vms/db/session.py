@@ -60,7 +60,8 @@ def session_scope() -> Iterator[Session]:
 
 
 def seed(session: Session) -> User:
-    """Ensure the built-in `system` admin exists (used until Phase 3 auth)."""
+    """Ensure the built-in `system` user exists. It has no password, so it can't log in;
+    it only marks system-written records."""
     user = session.scalar(select(User).where(User.email == SYSTEM_USER_EMAIL))
     if user is None:
         user = User(email=SYSTEM_USER_EMAIL, name="System", role=Role.admin)

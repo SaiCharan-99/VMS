@@ -1,12 +1,20 @@
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
+from argon2 import PasswordHasher
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from vms import security
 from vms.analysis.detectors import get_ocr_reader, get_yolo
 from vms.config import get_settings
-from vms.db import create_all, get_engine, get_sessionmaker
+from vms.db import create_all, get_engine, get_sessionmaker, session_scope
+from vms.db.models import Role, User
+from vms.services import api_keys, users
+from vms.services.principal import Principal
+
+TEST_PASSWORD = "correct-horse-1"
 
 
 def _clear_caches() -> None:
@@ -17,6 +25,7 @@ def _clear_caches() -> None:
     get_yolo.cache_clear()
     get_engine.cache_clear()
     get_sessionmaker.cache_clear()
+    security.jwt_secret.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -26,6 +35,10 @@ def isolated_settings(
     """Keep tests off the real DB/data dir; disable heavy models unless marked `models`."""
     monkeypatch.setenv("VMS_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("VMS_DB_URL", f"sqlite:///{(tmp_path / 'vms.db').as_posix()}")
+    monkeypatch.setenv("VMS_ENV", "dev")
+    monkeypatch.setenv("VMS_JWT_SECRET", "test-secret-" + "x" * 32)
+    # Cheap argon2 parameters keep the role matrix fast; production uses the library defaults.
+    monkeypatch.setattr(security, "_hasher", PasswordHasher(time_cost=1, memory_cost=1024))
     if request.node.get_closest_marker("models") is None:
         monkeypatch.setenv("VMS_OCR_ENABLED", "false")
         monkeypatch.setenv("VMS_YOLO_ENABLED", "false")
@@ -41,8 +54,60 @@ def db_ready() -> None:
 
 
 @pytest.fixture
-def client(db_ready: None) -> Iterator[TestClient]:
+def make_user(db_ready: None) -> Callable[..., User]:
+    """`make_user(Role.operator)` -> a committed user with password `TEST_PASSWORD`."""
+    counter = iter(range(1, 10_000))
+
+    def make(role: Role = Role.operator, email: str | None = None, **kw) -> User:
+        email = email or f"{role.value}{next(counter)}@test.local"
+        with session_scope() as s:
+            return users.create(
+                s, email=email, name=email.split("@")[0], password=TEST_PASSWORD, role=role, **kw
+            )
+
+    return make
+
+
+def auth(user: User) -> dict[str, str]:
+    return {"Authorization": f"Bearer {security.create_access_token(user.id)}"}
+
+
+@pytest.fixture
+def make_api_key(make_user: Callable[..., User]) -> Callable[[], tuple[int, dict[str, str]]]:
+    """`make_api_key()` -> (key id, headers)."""
+
+    def make() -> tuple[int, dict[str, str]]:
+        admin = make_user(Role.admin)
+        with session_scope() as s:
+            key, plaintext = api_keys.create(s, "test key", Principal.for_user(s.merge(admin)))
+            return key.id, {"X-API-Key": plaintext}
+
+    return make
+
+
+@pytest.fixture
+def app(db_ready: None) -> FastAPI:
     from vms.api.main import create_app
 
-    with TestClient(create_app()) as c:
+    return create_app()
+
+
+@pytest.fixture
+def anon_client(app: FastAPI) -> Iterator[TestClient]:
+    with TestClient(app) as c:
+        yield c
+
+
+@pytest.fixture
+def client(app: FastAPI, make_user: Callable[..., User]) -> Iterator[TestClient]:
+    """Logged in as an admin (sees and may do everything)."""
+    with TestClient(app, headers=auth(make_user(Role.admin, "admin@test.local"))) as c:
+        yield c
+
+
+@pytest.fixture
+def api_client(app: FastAPI, make_api_key) -> Iterator[TestClient]:
+    """Authenticated with an API key (acts as an operator; legacy routes allowed)."""
+    _, headers = make_api_key()
+    with TestClient(app, headers=headers) as c:
         yield c

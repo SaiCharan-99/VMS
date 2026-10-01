@@ -142,6 +142,8 @@ class Video(Base):
     awb: Mapped[str | None] = mapped_column(String(100))
     order_ref: Mapped[str | None] = mapped_column(String(100))
     uploaded_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"))
+    # Set for API-key uploads; an API key only sees the videos it uploaded.
+    api_key_id: Mapped[int | None] = mapped_column(ForeignKey("api_keys.id"), index=True)
     station_id: Mapped[int | None] = mapped_column(ForeignKey("stations.id"))
     source: Mapped[VideoSource] = mapped_column(_enum(VideoSource))
     duration_s: Mapped[float | None] = mapped_column(Float)

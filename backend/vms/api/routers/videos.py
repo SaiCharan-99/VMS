@@ -5,22 +5,25 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from vms.api.deps import PageParams, get_current_user, get_db
+from vms.api.deps import PageParams, admin_only, any_role, get_db, reviewer_up
 from vms.api.schemas import JobOut, Page, ReviewOut, UploadOut, VideoDetail, VideoOut
 from vms.api.views import analysis_out, video_out, video_outs
 from vms.config import get_settings
-from vms.db.models import FinalStatus, ProcessType, User, Video, VideoSource
+from vms.db.models import FinalStatus, ProcessType, Station, Video, VideoSource
 from vms.services import analyses, jobs
 from vms.services import videos as video_svc
+from vms.services.principal import Principal
 from vms.storage import Storage, get_storage
 
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 
-def _get_video(db: Session, video_id: int) -> Video:
+def _get_video(db: Session, video_id: int, principal: Principal) -> Video:
     video = db.get(Video, video_id)
     if video is None or video.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Video not found.")
+    if not principal.can_see(video):
+        raise HTTPException(status_code=403, detail="Not your video.")
     return video
 
 
@@ -39,10 +42,12 @@ def upload_video(
     station_id: int | None = Form(None),
     db: Session = Depends(get_db),
     storage: Storage = Depends(get_storage),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(any_role),
 ) -> UploadOut:
     """Store the video and queue an analysis job. Returns at once; poll `GET /jobs/{id}`."""
     settings = get_settings()
+    if station_id is not None and db.get(Station, station_id) is None:
+        raise HTTPException(status_code=400, detail="Station not found.")
     try:
         outcome = video_svc.create_from_upload(
             db,
@@ -50,8 +55,8 @@ def upload_video(
             file.file,
             file.filename or "",
             process_type,
-            user=user,
-            source=VideoSource.web,
+            actor=principal,
+            source=VideoSource.api if principal.api_key else VideoSource.web,
             max_bytes=settings.max_upload_mb * 1024 * 1024,
             content_type=file.content_type,
             awb=awb,
@@ -85,12 +90,12 @@ def list_videos(
     sort: str = Query("-created_at", enum=list(video_svc.SORTS)),
     paging: PageParams = Depends(),
     db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(any_role),
 ) -> Page[VideoOut]:
     filters = video_svc.VideoFilters(
         status, process_type, awb, q, station_id, uploaded_by, date_from, date_to
     )
-    stmt = video_svc.list_query(filters, user, sort)
+    stmt = video_svc.list_query(filters, principal, sort)
     total = db.scalar(select(func.count()).select_from(stmt.order_by(None).subquery()))
     rows = db.scalars(stmt.offset(paging.offset).limit(paging.page_size)).all()
     return Page[VideoOut](
@@ -100,10 +105,12 @@ def list_videos(
 
 @router.get("/{video_id}", response_model=VideoDetail)
 def get_video(
-    video_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+    video_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(any_role),
 ) -> VideoDetail:
     """The video, its latest analysis (full result + evidence URLs), reviews, and latest job."""
-    video = _get_video(db, video_id)
+    video = _get_video(db, video_id, principal)
     latest = analyses.latest_analysis(db, video.id)
     job = jobs.latest_job(db, video.id)
     return VideoDetail(
@@ -123,10 +130,10 @@ def stream_video(
     video_id: int,
     db: Session = Depends(get_db),
     storage: Storage = Depends(get_storage),
-    user: User = Depends(get_current_user),
+    principal: Principal = Depends(any_role),
 ) -> FileResponse:
     """The video file. Supports HTTP Range for seeking in a `<video>` player."""
-    video = _get_video(db, video_id)
+    video = _get_video(db, video_id, principal)
     if not video.storage_key or not storage.exists(video.storage_key):
         raise HTTPException(status_code=404, detail="Video file not available.")
     return FileResponse(
@@ -139,22 +146,26 @@ def stream_video(
 
 @router.post("/{video_id}/reanalyze", status_code=201, response_model=JobOut)
 def reanalyze_video(
-    video_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+    video_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(reviewer_up),
 ) -> JobOut:
     """Queue a fresh analysis, e.g. after a rubric or model upgrade."""
-    video = _get_video(db, video_id)
+    video = _get_video(db, video_id, principal)
     if not video.storage_key:
         raise HTTPException(status_code=409, detail="Legacy import has no video file.")
-    job = video_svc.reanalyze(db, video, user, get_settings().job_max_attempts)
+    job = video_svc.reanalyze(db, video, principal, get_settings().job_max_attempts)
     db.commit()
     return JobOut.model_validate(job)
 
 
 @router.delete("/{video_id}", status_code=204)
 def delete_video(
-    video_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)
+    video_id: int,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(admin_only),
 ) -> Response:
     """Soft delete (the file and records are kept for the audit trail)."""
-    video_svc.soft_delete(db, _get_video(db, video_id), user)
+    video_svc.soft_delete(db, _get_video(db, video_id, principal), principal)
     db.commit()
     return Response(status_code=204)
