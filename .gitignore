@@ -12,3 +12,17 @@ __pycache__/
 .vscode/
 venv/
 .env
+
+# Models, databases, local data
+*.pt
+*.db
+data/
+training_images/
+
+# Tooling caches / builds
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+node_modules/
+dist/
