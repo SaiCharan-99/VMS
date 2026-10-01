@@ -38,7 +38,7 @@ Phase 5 (done except the stretch PDF):
 - [x] `services/reports.py` + `GET /reports/summary` (totals, pass rate, review rate, agreement, avg score, avg turnaround, top failed checks from `result_json`, groups by day/station/operator/process_type; tz-aware local days)
 - [x] `GET /reports/export.csv`: Streamlit columns + AWB, Station, Operator, Final Status, Reviewer, Review Reason, Review Comment; UTF-8 BOM; streamed in 500-video batches on its own session
 - [ ] `GET /videos/{id}/report.pdf`: **skipped (stretch goal)**; no PDF library added
-- [x] Backend tests: `test_reviews.py` (13), `test_reports.py` (8, hand-calculated fixture `tests/report_fixture.py`), `test_sop_doc.py` (2), role matrix +4 routes. Suite **295 passed**
+- [x] Backend tests: `test_reviews.py` (11), `test_reports.py` (8, hand-calculated fixture `tests/report_fixture.py`), `test_sop_doc.py` (2), role matrix +4 routes (20 cases). Suite **293 passed**
 - [x] `/review`: queue list + focused `InspectionView` + sticky `ReviewBar`; keys 1–7 reason, P/F decide, N next, J/K ±5 s, Esc leaves a field; optimistic advance with rollback on error; nav badge with the queue size
 - [x] Review history on `/videos/:id` (`ReviewHistory`); human-override icon in lists (`StatusBadge human`)
 - [x] `/reports`: 7/30/90/custom range, type + station filters, 4 KPI tiles, stacked status-per-day chart (Recharts) + table view, top failed checks, station/operator breakdown, CSV export (also on Inspections for reviewer+)
@@ -228,7 +228,7 @@ Phase 0 (all done):
 
 ### 2026-10-01 — Phase 5 session
 - Baseline: 251 passed, **1 failed** (`test_jwt_secret_required_outside_dev`, caused by a developer `.env`); fixed in conftest → 252. Branch `phase-5-review-reports-admin`.
-- Backend now **295 passed**; ruff check/format clean. Frontend: typecheck, lint (0 warnings), 26 tests, and build all green.
+- Backend now **293 passed**; ruff check/format clean. Frontend: typecheck, lint (0 warnings), 26 tests, and build all green.
 - **Acceptance 2** (report math): `test_reports.py::test_summary_matches_hand_calculation` asserts every KPI, the top failed checks, and gap-filled day groups against the table in `tests/report_fixture.py`. Other tests cover station/operator groups, filters, a UTC+12 day shift, and the CSV.
 - **Acceptance 3** (CSV): BOM and review columns asserted in `test_csv_export`. Not opened in a real Excel.
 - **Live check** (built-in browser; scratch DB and data dir in the session scratchpad, API on :8001, Vite `--mode scratch` on :5174, because port 8000 was taken by another local python process, which was left alone): seeded 14 synthetic H.264 videos (MSMF), 12 in the review queue. As `reviewer@vms.local`, cleared **11 videos using only the keyboard** (reason digit + P/F, auto-advancing each time). DB check: 11 reviews, each video's final status matches, and each has a `review.created` audit row with the reviewer id and reason (**acceptance 1**). The Reports page matched a hand count (6/14 pass = 42.9%, 12/14 model review = 85.7%, agreement "—" because every reviewed verdict was a model `review`). As admin, created a new operator in Admin → Users, logged in as them (operator-only nav), and uploaded through `/upload` → "Queued for analysis" (**acceptance 4**).
