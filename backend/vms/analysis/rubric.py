@@ -12,11 +12,11 @@ from pydantic import BaseModel, Field, model_validator
 from vms.analysis.detectors.base import EVIDENCE_KINDS
 from vms.analysis.metrics import METRIC_KEYS
 from vms.analysis.result import DECISIONS, CheckResult, MetricValue, Status, StepResult
+from vms.config import Settings, get_settings
 
 log = logging.getLogger(__name__)
 
 RUBRICS_DIR = Path(__file__).parent / "rubrics"
-DEFAULT_RUBRICS = {"Forward": "forward-v1", "Return": "return-v1"}
 TOTAL_POINTS = 100
 
 Op = Literal[">=", ">", "<=", "<", "==", "!="]
@@ -123,8 +123,14 @@ def get_rubric(rubric_id: str) -> Rubric:
     return load_rubric(RUBRICS_DIR / f"{rubric_id}.yaml")
 
 
-def rubric_for(process_type: str) -> Rubric:
-    return get_rubric(DEFAULT_RUBRICS[process_type])
+def active_rubric_ids(settings: Settings | None = None) -> dict[str, str]:
+    """Process type -> active rubric id (`VMS_RUBRIC_FORWARD` / `VMS_RUBRIC_RETURN`)."""
+    settings = settings or get_settings()
+    return {"Forward": settings.rubric_forward, "Return": settings.rubric_return}
+
+
+def rubric_for(process_type: str, settings: Settings | None = None) -> Rubric:
+    return get_rubric(active_rubric_ids(settings)[process_type])
 
 
 def _evaluate_check(check: Check, metrics: dict[str, MetricValue]) -> CheckResult:

@@ -1,0 +1,45 @@
+# Forward (packing) SOP rubric v2. Needs a custom detector model (ml/train.py); see return-v2.
+id: forward-v2
+process_type: Forward
+title: Forward (Packing) SOP
+decision:
+  pass:   { min_score: 85, min_confidence: 0.70 }
+  review: { min_score: 50, min_confidence: 0.40 }
+caps:
+  - { id: no_barcode_max_review,  when: { metric: barcode_found,    op: "==", value: false }, max_status: review }
+  - { id: low_quality_max_review, when: { metric: quality_ok_ratio, op: "<",  value: 0.5 },   max_status: review }
+  - { id: too_short_fail,         when: { metric: duration_s,       op: "<",  value: 3 },     max_status: fail }
+steps:
+  - key: shipping_label
+    title: Shipping Label & Barcode
+    description: Label clearly visible, barcode readable before sealing
+    evidence: [barcode, label]
+    checks:
+      - { key: label_text_visible, metric: avg_text_blocks,         op: ">",  value: 5,    points: 8,  fail_note: "No clear text/label detected. Hold label closer." }
+      - { key: label_held,         metric: max_label_hold_s,        op: ">=", value: 2.0,  points: 5,  fail_note: "Label not held steady for 2 seconds." }
+      - { key: barcode_read,       metric: barcode_found,           op: "==", value: true, points: 15, fail_note: "Barcode not read. Ensure it is in focus." }
+      - { key: label_with_barcode, metric: label_and_barcode_ratio, op: ">",  value: 0.05, points: 2,  fail_note: "Show the label and its barcode together." }
+  - key: packing
+    title: Packing & Sealing
+    description: Item packed correctly, bag/box sealed fully on camera
+    evidence: [package, motion]
+    checks:
+      - { key: package_visible, metric: package_ratio,      op: ">",  value: 0.4,  points: 6, fail_note: "Package not consistently visible." }
+      - { key: seal_visible,    metric: seal_visible_ratio, op: ">",  value: 0.05, points: 6, fail_note: "Show the seal being applied." }
+      - { key: sealing_motion,  metric: end_activity_ratio, op: ">=", value: 0.3,  points: 4, fail_note: "No sealing activity seen at the end of the video." }
+      - { key: long_enough,     metric: duration_s,         op: ">",  value: 10,   points: 4, fail_note: "Video too short for full process." }
+  - key: tags
+    title: Brand Tag & Hangtag
+    description: Brand tags attached and visible before packing
+    evidence: [tag, text]
+    checks:
+      - { key: tag_visible,  metric: tag_ratio,          op: ">", value: 0.1,  points: 10, fail_note: "Brand tag not detected clearly." }
+      - { key: tag_close_up, metric: tag_close_up_ratio, op: ">", value: 0.05, points: 8,  fail_note: "Hold the tag close to the camera." }
+      - { key: tag_readable, metric: avg_text_blocks,    op: ">", value: 3,    points: 7,  fail_note: "Tag text not readable." }
+  - key: product
+    title: Product Condition
+    description: Item unfolded and inspected for defects before packing
+    evidence: [product]
+    checks:
+      - { key: product_visible, metric: product_ratio,           op: ">", value: 0.4, points: 18, fail_note: "Product not visible enough." }
+      - { key: hand_on_product, metric: hand_with_product_ratio, op: ">", value: 0.1, points: 7,  fail_note: "Handle the product so the inspection is visible." }

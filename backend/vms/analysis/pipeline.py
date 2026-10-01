@@ -70,11 +70,19 @@ def analyze_video(
     settings: Settings | None = None,
     evidence_dir: Path | None = None,
     progress_cb: ProgressCallback | None = None,
+    rubric_id: str | None = None,
 ) -> AnalysisResult:
-    """Analyze one video. `progress_cb` receives 0..1 while frames are processed."""
+    """Analyze one video. `progress_cb` receives 0..1 while frames are processed.
+
+    `rubric_id` overrides the active rubric for this call (evaluation, A/B runs).
+    """
     t_start = time.perf_counter()
     settings = settings or get_settings()
-    rubric = rubric_mod.rubric_for(process_type)
+    rubric = (
+        rubric_mod.get_rubric(rubric_id)
+        if rubric_id
+        else rubric_mod.rubric_for(process_type, settings)
+    )
 
     sampler = VideoSampler(Path(path), settings.process_fps, settings.analysis_width)
     meta = sampler.meta

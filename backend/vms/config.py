@@ -21,7 +21,19 @@ class Settings(BaseSettings):
     # Text detection runs on a smaller copy: ~0.40 s vs ~0.70 s per frame at 640 on CPU.
     ocr_width: int = 480
     yolo_conf: float = 0.35
-    # COCO stopgap until the Phase 6 custom model: class name -> role ("product" | "package").
+    # <weights>.model_card.json next to the weights (written by ml/train.py) overrides the class
+    # map; set this to read the card from elsewhere.
+    yolo_model_card: Path | None = None
+    # Run YOLO on every k-th valid frame (flags carry forward in between), plus any frame where
+    # the small-tag heuristic fires.
+    yolo_every_n: int = 1
+    # A tag box covering at least this fraction of the frame counts as a close-up.
+    tag_close_up_frac: float = 0.04
+    # Active rubric per process type: switching versions is config-only.
+    rubric_forward: str = "forward-v1"
+    rubric_return: str = "return-v1"
+    # Class name -> role. Roles: product, package, label, barcode, tag, seal, hand, tool.
+    # This COCO map is a stopgap used only when no model card is found.
     yolo_class_map: dict[str, str] = {
         "handbag": "product",
         "backpack": "product",

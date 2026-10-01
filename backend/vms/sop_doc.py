@@ -4,7 +4,7 @@ Regenerate after any rubric change: `python -m vms.cli sop-doc --out docs/SOP.md
 A test fails when the committed file is out of date.
 """
 
-from vms.analysis.rubric import DEFAULT_RUBRICS, Check, Rubric, get_rubric
+from vms.analysis.rubric import Check, Rubric, active_rubric_ids, get_rubric
 
 # What each check looks for, in words an operator can act on. Thresholds come from the YAML.
 WHAT_IT_LOOKS_FOR = {
@@ -19,6 +19,10 @@ WHAT_IT_LOOKS_FOR = {
     "tag_readable": "Readable text on the tags",
     "product_visible": "The product itself, unfolded and in view",
     "product_turned": "The product turned over to show both sides",
+    "label_with_barcode": "The label and its barcode in view together",
+    "seal_visible": "The seal or tape in view",
+    "tag_close_up": "A tag held close enough to read",
+    "hand_on_product": "A hand handling the product",
 }
 
 CAP_TEXT = {
@@ -85,7 +89,7 @@ def _rubric_section(rubric: Rubric) -> list[str]:
 
 
 def render() -> str:
-    rubrics = [get_rubric(rid) for rid in DEFAULT_RUBRICS.values()]
+    rubrics = [get_rubric(rid) for rid in active_rubric_ids().values()]
     caps = {c.id for r in rubrics for c in r.caps}
     lines = [
         "# VMS recording SOP: what the system checks",

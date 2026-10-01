@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from vms.analysis.rubric import DEFAULT_RUBRICS, get_rubric
+from vms.analysis.rubric import active_rubric_ids, get_rubric
 from vms.sop_doc import WHAT_IT_LOOKS_FOR, render
 
 SOP_MD = Path(__file__).resolve().parents[2] / "docs" / "SOP.md"
@@ -8,7 +8,7 @@ SOP_MD = Path(__file__).resolve().parents[2] / "docs" / "SOP.md"
 
 def test_every_check_is_explained():
     text = render()
-    for rubric_id in DEFAULT_RUBRICS.values():
+    for rubric_id in active_rubric_ids().values():
         rubric = get_rubric(rubric_id)
         assert rubric.title in text
         for step in rubric.steps:

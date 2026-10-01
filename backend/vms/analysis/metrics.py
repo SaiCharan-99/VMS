@@ -21,6 +21,11 @@ METRIC_KEYS = frozenset(
         "max_label_hold_s",
         "quality_ok_ratio",
         "frames_sampled",
+        # Need a custom detector model (roles seal / hand / tag / label); 0 without one.
+        "seal_visible_ratio",
+        "hand_with_product_ratio",
+        "tag_close_up_ratio",
+        "label_and_barcode_ratio",
     }
 )
 
@@ -83,5 +88,9 @@ def aggregate(
         "max_label_hold_s": _max_label_hold_s(signals, interval_s),
         "quality_ok_ratio": _ratio(nv, n),
         "frames_sampled": n,
+        "seal_visible_ratio": _ratio(sum(s.seal for s in valid), nv),
+        "hand_with_product_ratio": _ratio(sum(s.hand_with_product for s in valid), nv),
+        "tag_close_up_ratio": _ratio(sum(s.tag_close_up for s in valid), nv),
+        "label_and_barcode_ratio": _ratio(sum(s.label and bool(s.barcodes) for s in valid), nv),
     }
     return metrics

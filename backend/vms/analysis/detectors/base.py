@@ -14,7 +14,7 @@ class BarcodeHit:
 
 @dataclass(frozen=True)
 class Box:
-    role: str  # "product" | "package"
+    role: str  # product | package | label | barcode | tag | seal | hand | tool
     cls: str
     conf: float
     xyxy: tuple[float, float, float, float]
@@ -32,6 +32,9 @@ class FrameSignals:
     package: bool = False
     tag: bool = False
     product: bool = False
+    seal: bool = False
+    hand_with_product: bool = False
+    tag_close_up: bool = False
     motion_dir: int = 0  # 1 / -1 / 0
     motion_mag: float = 0.0
     boxes: list[Box] = field(default_factory=list)

@@ -35,6 +35,10 @@ const CHECK_LABEL: Record<string, string> = {
   tag_readable: "Tag text readable",
   product_visible: "Product visible",
   product_turned: "Both sides of the product shown",
+  label_with_barcode: "Label and barcode shown together",
+  seal_visible: "Seal visible",
+  tag_close_up: "Tag held close to the camera",
+  hand_on_product: "Product handled on camera",
 };
 
 function humanize(key: string): string {

@@ -16,7 +16,7 @@ from typing import Any, Literal
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session
 
-from vms.analysis.rubric import DEFAULT_RUBRICS, get_rubric
+from vms.analysis.rubric import active_rubric_ids, get_rubric
 from vms.db.models import Analysis, FinalStatus, Review, Station, User, Video
 
 GroupBy = Literal["day", "station", "operator", "process_type"]
@@ -250,7 +250,7 @@ def summarize(
 def step_titles() -> list[str]:
     """Union of active rubric step titles, in rubric order (Forward first)."""
     titles: list[str] = []
-    for rubric_id in DEFAULT_RUBRICS.values():
+    for rubric_id in active_rubric_ids().values():
         for step in get_rubric(rubric_id).steps:
             if step.title not in titles:
                 titles.append(step.title)

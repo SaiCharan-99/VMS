@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from vms.analysis.rubric import DEFAULT_RUBRICS, get_rubric
+from vms.analysis.rubric import active_rubric_ids, get_rubric
 from vms.api.deps import get_current_principal
 from vms.api.schemas import RubricOut, RubricStepOut
 from vms.services.principal import Principal
@@ -12,7 +12,7 @@ router = APIRouter(prefix="/rubrics", tags=["rubrics"])
 def list_rubrics(principal: Principal = Depends(get_current_principal)) -> list[RubricOut]:
     """Active rubrics, one per process type (step titles and descriptions for the UI)."""
     out = []
-    for rubric_id in DEFAULT_RUBRICS.values():
+    for rubric_id in active_rubric_ids().values():
         r = get_rubric(rubric_id)
         steps = [
             RubricStepOut(key=s.key, title=s.title, description=s.description, weight=s.weight)
