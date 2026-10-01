@@ -13,8 +13,12 @@ import { AuthProvider } from "@/auth/AuthProvider";
 import { RequireRole } from "@/auth/RequireRole";
 import { AppShell } from "@/components/AppShell";
 import { ToastProvider } from "@/components/ui";
+import { ADMIN_ONLY, REVIEWER_UP } from "@/auth/roles";
+import { AdminPage } from "@/pages/AdminPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
+import { ReportsPage } from "@/pages/ReportsPage";
+import { ReviewPage } from "@/pages/ReviewPage";
 import { UploadPage } from "@/pages/UploadPage";
 import { VideoDetailPage } from "@/pages/VideoDetailPage";
 import { VideosPage } from "@/pages/VideosPage";
@@ -56,6 +60,33 @@ const routes: RouteObject[] = [
           { path: "/upload", element: <UploadPage />, handle: { title: "Upload" } },
           { path: "/videos", element: <VideosPage />, handle: { title: "Inspections" } },
           { path: "/videos/:id", element: <VideoDetailPage />, handle: { title: "Inspection" } },
+          {
+            path: "/review",
+            element: (
+              <RequireRole roles={REVIEWER_UP}>
+                <ReviewPage />
+              </RequireRole>
+            ),
+            handle: { title: "Review queue" },
+          },
+          {
+            path: "/reports",
+            element: (
+              <RequireRole roles={REVIEWER_UP}>
+                <ReportsPage />
+              </RequireRole>
+            ),
+            handle: { title: "Reports" },
+          },
+          {
+            path: "/admin",
+            element: (
+              <RequireRole roles={ADMIN_ONLY}>
+                <AdminPage />
+              </RequireRole>
+            ),
+            handle: { title: "Admin" },
+          },
           ...(import.meta.env.DEV
             ? [
                 {

@@ -80,6 +80,39 @@ export async function request<T>(
   return parsed.data;
 }
 
+/** GET a file with auth and hand it to the browser as a download. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = getToken();
+  const headers = new Headers();
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  let resp: Response;
+  try {
+    resp = await fetch(apiUrl(path), { headers });
+  } catch {
+    throw new ApiError(0, "Can't reach the server. Check your connection.");
+  }
+  if (!resp.ok) {
+    const text = await resp.text();
+    let body: unknown = text;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      /* not JSON */
+    }
+    handleStatus(resp.status, body, Boolean(token));
+  }
+  const name =
+    /filename="([^"]+)"/.exec(resp.headers.get("Content-Disposition") ?? "")?.[1] ?? fallbackName;
+  const url = URL.createObjectURL(await resp.blob());
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export interface UploadHandle<T> {
   promise: Promise<T>;
   abort: () => void;

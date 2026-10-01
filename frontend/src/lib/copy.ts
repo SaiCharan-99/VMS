@@ -1,4 +1,5 @@
 import type { Check, Status, StepStatus } from "@/types/analysis";
+import type { ReasonCode } from "@/types/api";
 
 export type BadgeStatus = Status | "pending";
 
@@ -54,4 +55,22 @@ export function isFullResult<T extends { schema_version: string }>(r: unknown): 
     r !== null &&
     (r as { schema_version?: unknown }).schema_version === "2.0"
   );
+}
+
+export const REASON_LABEL: Record<ReasonCode, string> = {
+  label_unclear: "Label unclear",
+  seal_not_shown: "Seal not shown",
+  tags_not_shown: "Tags not shown",
+  product_not_inspected: "Product not inspected",
+  video_quality: "Video quality",
+  false_negative_model: "Model was wrong (operator compliant)",
+  other: "Other",
+};
+
+export function reasonLabel(code: string): string {
+  return REASON_LABEL[code as ReasonCode] ?? humanize(code);
+}
+
+export function checkLabel(key: string): string {
+  return CHECK_LABEL[key] ?? humanize(key);
 }

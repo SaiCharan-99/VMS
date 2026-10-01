@@ -4,6 +4,8 @@ import { formatDuration } from "@/lib/format";
 
 export interface VideoPlayerHandle {
   seek: (t: number) => void;
+  /** Seek relative to the current time. */
+  skip: (dt: number) => void;
 }
 
 const SKIP_S = 5;
@@ -26,7 +28,11 @@ export const VideoPlayer = forwardRef<
     const max = Number.isFinite(v.duration) ? v.duration : t;
     v.currentTime = Math.max(0, Math.min(max, t));
   };
-  useImperativeHandle(ref, () => ({ seek }), []);
+  useImperativeHandle(
+    ref,
+    () => ({ seek, skip: (dt: number) => seek((video.current?.currentTime ?? 0) + dt) }),
+    [],
+  );
 
   const toggle = () => {
     const v = video.current;
@@ -39,6 +45,7 @@ export const VideoPlayer = forwardRef<
     if ((e.target as HTMLElement).tagName === "INPUT") return;
     const v = video.current;
     if (!v) return;
+    if (" jJkK".includes(e.key)) e.stopPropagation(); // page-level shortcuts must not repeat it
     if (e.key === " ") {
       e.preventDefault();
       toggle();

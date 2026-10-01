@@ -48,3 +48,12 @@ export function isoDate(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
+
+/** "2026-09-10" (a local calendar day) → "10 Sept". */
+export function dayLabel(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y ?? 0, (m ?? 1) - 1, d ?? 1).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+  });
+}

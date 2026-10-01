@@ -13,3 +13,4 @@ export { Segmented, type SegmentedOption } from "./Segmented";
 export { Skeleton } from "./Skeleton";
 export { StatusBadge } from "./StatusBadge";
 export { ToastProvider, useToast } from "./Toast";
+export { Field, Tabs, type TabItem } from "./Tabs";

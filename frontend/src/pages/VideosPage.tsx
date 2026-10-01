@@ -1,10 +1,20 @@
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
-import { SearchX } from "lucide-react";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { Download, SearchX } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, type VideoQuery } from "@/api/endpoints";
+import { useAuth } from "@/auth/AuthProvider";
+import { hasRole, REVIEWER_UP } from "@/auth/roles";
 import { VideoTable } from "@/components/VideoTable";
-import { Button, Card, EmptyState, ErrorState, FilterBar, Segmented } from "@/components/ui";
+import {
+  Button,
+  Card,
+  EmptyState,
+  ErrorState,
+  FilterBar,
+  Segmented,
+  useToast,
+} from "@/components/ui";
 import { isoDate } from "@/lib/format";
 
 const PAGE_SIZE = 25;
@@ -63,6 +73,12 @@ export function VideosPage() {
     queryFn: () => api.videos(query),
     placeholderData: keepPreviousData,
   });
+  const { user } = useAuth();
+  const toast = useToast();
+  const exportCsv = useMutation({
+    mutationFn: () => api.exportCsv({ ...query, page: undefined, page_size: undefined }),
+    onError: (err) => toast(err instanceof Error ? err.message : "Export failed.", "error"),
+  });
   const data = videos.data;
   const filtered = Boolean(status || type || range || q);
   const first = data && data.total ? (data.page - 1) * data.page_size + 1 : 0;
@@ -70,7 +86,16 @@ export function VideosPage() {
 
   return (
     <>
-      <FilterBar>
+      <FilterBar
+        end={
+          hasRole(user, REVIEWER_UP) && (
+            <Button onClick={() => exportCsv.mutate()} loading={exportCsv.isPending}>
+              <Download size={15} aria-hidden />
+              Export CSV
+            </Button>
+          )
+        }
+      >
         <Segmented
           label="Status"
           value={status}

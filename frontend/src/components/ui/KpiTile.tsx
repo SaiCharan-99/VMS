@@ -8,9 +8,11 @@ export interface KpiTileProps {
   /** Text under the value; `trend` colours it (good = green, bad = red). */
   delta?: string;
   trend?: "good" | "bad" | "neutral";
+  /** Extra content under the delta, e.g. a sparkline. */
+  children?: ReactNode;
 }
 
-export function KpiTile({ label, value, delta, trend = "neutral" }: KpiTileProps) {
+export function KpiTile({ label, value, delta, trend = "neutral", children }: KpiTileProps) {
   return (
     <Card className="px-[18px] py-4">
       <div className="text-[12.5px] text-text-2">{label}</div>
@@ -25,6 +27,7 @@ export function KpiTile({ label, value, delta, trend = "neutral" }: KpiTileProps
           {delta}
         </div>
       )}
+      {children}
     </Card>
   );
 }

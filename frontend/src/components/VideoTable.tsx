@@ -60,7 +60,7 @@ const COLUMNS: Record<string, Column<Video>> = {
   status: {
     key: "status",
     header: "Status",
-    cell: (v) => <StatusBadge status={v.final_status} />,
+    cell: (v) => <StatusBadge status={v.final_status} human={v.human_reviewed} />,
   },
 };
 

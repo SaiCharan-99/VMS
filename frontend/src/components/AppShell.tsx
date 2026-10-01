@@ -1,9 +1,23 @@
-import { LayoutDashboard, LogOut, Moon, Plus, Search, Sun, Upload, Video } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import {
+  BarChart3,
+  ClipboardCheck,
+  LayoutDashboard,
+  LogOut,
+  Moon,
+  Plus,
+  Search,
+  Settings,
+  Sun,
+  Upload,
+  Video,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useState, type FormEvent } from "react";
 import { NavLink, Outlet, useMatches, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthProvider";
-import { ALL_ROLES, hasRole } from "@/auth/roles";
+import { api } from "@/api/endpoints";
+import { ADMIN_ONLY, ALL_ROLES, hasRole, REVIEWER_UP } from "@/auth/roles";
 import { Button, IconButton } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { useTheme } from "@/lib/theme";
@@ -16,12 +30,25 @@ interface NavItem {
   roles: readonly Role[];
 }
 
-// Review queue, Reports and Admin join this list in Phase 5 (reviewer+/admin only).
 const NAV: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, roles: ALL_ROLES },
   { to: "/upload", label: "Upload", icon: Upload, roles: ALL_ROLES },
   { to: "/videos", label: "Inspections", icon: Video, roles: ALL_ROLES },
+  { to: "/review", label: "Review queue", icon: ClipboardCheck, roles: REVIEWER_UP },
+  { to: "/reports", label: "Reports", icon: BarChart3, roles: REVIEWER_UP },
+  { to: "/admin", label: "Admin", icon: Settings, roles: ADMIN_ONLY },
 ];
+
+/** Size of the review queue for the nav badge (reviewers and admins only). */
+function useQueueCount(enabled: boolean): number | undefined {
+  const q = useQuery({
+    queryKey: ["review-queue", "count"],
+    queryFn: () => api.reviewQueue({ page_size: 1 }),
+    enabled,
+    refetchInterval: 30_000,
+  });
+  return q.data?.total;
+}
 
 const ROLE_LABEL: Record<Role, string> = {
   operator: "Operator",
@@ -79,6 +106,7 @@ export function AppShell() {
   const title = usePageTitle();
   const navigate = useNavigate();
   const items = NAV.filter((n) => hasRole(user, n.roles));
+  const queueCount = useQueueCount(hasRole(user, REVIEWER_UP));
 
   return (
     <div className="grid min-h-screen grid-cols-1 md:grid-cols-[232px_minmax(0,1fr)]">
@@ -112,6 +140,12 @@ export function AppShell() {
             >
               <n.icon size={17} strokeWidth={1.8} aria-hidden />
               {n.label}
+              {n.to === "/review" && Boolean(queueCount) && (
+                <span className="tabular ml-auto rounded-full bg-review-soft px-1.5 text-xs font-semibold text-review">
+                  {queueCount}
+                  <span className="sr-only"> awaiting review</span>
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

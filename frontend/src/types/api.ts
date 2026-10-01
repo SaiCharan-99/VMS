@@ -84,12 +84,14 @@ export const videoSchema = z.object({
   final_status: finalStatusSchema,
   stream_url: z.string().nullable().optional(),
   latest_analysis: analysisBriefSchema.nullable().optional(),
+  human_reviewed: z.boolean().optional(),
 });
 
 export const reviewSchema = z.object({
   id: z.number(),
   analysis_id: z.number(),
   reviewer_id: z.number(),
+  reviewer_name: z.string().nullable().optional(),
   final_status: statusSchema.exclude(["review"]),
   reason_code: z.string(),
   comment: z.string().nullable(),
@@ -128,6 +130,98 @@ export const rubricSchema = z.object({
   ),
 });
 
+export const REASON_CODES = [
+  "label_unclear",
+  "seal_not_shown",
+  "tags_not_shown",
+  "product_not_inspected",
+  "video_quality",
+  "false_negative_model",
+  "other",
+] as const;
+export type ReasonCode = (typeof REASON_CODES)[number];
+
+const statusCounts = {
+  total: z.number(),
+  pass: z.number(),
+  review: z.number(),
+  fail: z.number(),
+  pending: z.number(),
+};
+
+export const reportGroupSchema = z.object({
+  ...statusCounts,
+  key: z.string(),
+  label: z.string(),
+  pass_rate: z.number().nullable(),
+  avg_score: z.number().nullable(),
+});
+
+export const failedCheckSchema = z.object({
+  process_type: processTypeSchema,
+  step_key: z.string(),
+  check_key: z.string(),
+  step_title: z.string(),
+  note: z.string().nullable(),
+  failures: z.number(),
+  evaluated: z.number(),
+  rate: z.number().nullable(),
+});
+
+export const reportSummarySchema = z.object({
+  date_from: z.string(),
+  date_to: z.string(),
+  group_by: z.enum(["day", "station", "operator", "process_type"]),
+  totals: z.object(statusCounts),
+  analyzed: z.number(),
+  pass_rate: z.number().nullable(),
+  review_rate: z.number().nullable(),
+  reviewed: z.number(),
+  agreement_rate: z.number().nullable(),
+  agreement_n: z.number(),
+  avg_score: z.number().nullable(),
+  avg_turnaround_s: z.number().nullable(),
+  top_failed_checks: z.array(failedCheckSchema),
+  groups: z.array(reportGroupSchema),
+});
+
+export const warehouseSchema = z.object({
+  id: z.number(),
+  code: z.string(),
+  name: z.string(),
+  created_at: z.string(),
+});
+
+export const apiKeySchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  created_by: z.number(),
+  created_at: z.string(),
+  revoked_at: z.string().nullable(),
+});
+
+export const apiKeyCreatedSchema = apiKeySchema.extend({ key: z.string() });
+
+export const auditEntrySchema = z.object({
+  id: z.number(),
+  actor_user_id: z.number().nullable(),
+  actor_api_key_id: z.number().nullable(),
+  action: z.string(),
+  entity_type: z.string(),
+  entity_id: z.string().nullable(),
+  data: z.record(z.unknown()).nullable(),
+  created_at: z.string(),
+});
+
+export type Review = z.infer<typeof reviewSchema>;
+export type ReportSummary = z.infer<typeof reportSummarySchema>;
+export type ReportGroup = z.infer<typeof reportGroupSchema>;
+export type FailedCheck = z.infer<typeof failedCheckSchema>;
+export type GroupBy = ReportSummary["group_by"];
+export type Warehouse = z.infer<typeof warehouseSchema>;
+export type ApiKey = z.infer<typeof apiKeySchema>;
+export type ApiKeyCreated = z.infer<typeof apiKeyCreatedSchema>;
+export type AuditEntry = z.infer<typeof auditEntrySchema>;
 export type Role = z.infer<typeof roleSchema>;
 export type ProcessType = z.infer<typeof processTypeSchema>;
 export type FinalStatus = z.infer<typeof finalStatusSchema>;
