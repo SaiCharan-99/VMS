@@ -1,0 +1,41 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/jetbrains-mono/500.css";
+@import "./tokens.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-bg font-sans text-base text-text antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .mono {
+    @apply font-mono text-[12.5px];
+  }
+  .input {
+    @apply rounded-ctl border border-border-strong bg-surface px-2.5 py-2 text-text placeholder:text-text-3;
+  }
+  .select {
+    @apply rounded-ctl border border-border-strong bg-surface px-2.5 py-1.5 text-text;
+  }
+  .chip {
+    @apply inline-flex rounded-ctl bg-surface-2 px-2 py-px text-xs font-medium text-text-2;
+  }
+  .spin {
+    @apply inline-block h-3 w-3 animate-spin rounded-full border-2 border-accent-soft border-t-accent;
+  }
+}

@@ -1,0 +1,75 @@
+/* Design tokens: docs/UI_DESIGN.md §2. Deviation: --text-3 is darker than the spec
+   (#98a2b3 / #6b7380 fail WCAG AA for text); see PROGRESS.md → Decisions. */
+:root {
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --border: #e4e7ec;
+  --border-strong: #d0d5dd;
+  --text: #101828;
+  --text-2: #475467;
+  --text-3: #667085;
+  --accent: #2f5bea;
+  --accent-soft: #eef2ff;
+  --accent-text: #2443b8;
+  --on-accent: #ffffff;
+  --pass: #12805c;
+  --pass-soft: #e7f6ef;
+  --review: #b54708;
+  --review-soft: #fef4e6;
+  --fail: #c0262d;
+  --fail-soft: #fdeceb;
+  --on-status: #ffffff;
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0c0e12;
+    --surface: #14171c;
+    --surface-2: #1b1f26;
+    --border: #262b33;
+    --border-strong: #333a44;
+    --text: #eef0f3;
+    --text-2: #a3abb8;
+    --text-3: #8a93a1;
+    --accent: #6b8cff;
+    --accent-soft: #1a2240;
+    --accent-text: #a9bcff;
+    --on-accent: #0c0e12;
+    --pass: #3ccb8f;
+    --pass-soft: #10291f;
+    --review: #f2a443;
+    --review-soft: #2e2112;
+    --fail: #f2686e;
+    --fail-soft: #2f1517;
+    --on-status: #0c0e12;
+    --shadow: none;
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #0c0e12;
+  --surface: #14171c;
+  --surface-2: #1b1f26;
+  --border: #262b33;
+  --border-strong: #333a44;
+  --text: #eef0f3;
+  --text-2: #a3abb8;
+  --text-3: #8a93a1;
+  --accent: #6b8cff;
+  --accent-soft: #1a2240;
+  --accent-text: #a9bcff;
+  --on-accent: #0c0e12;
+  --pass: #3ccb8f;
+  --pass-soft: #10291f;
+  --review: #f2a443;
+  --review-soft: #2e2112;
+  --fail: #f2686e;
+  --fail-soft: #2f1517;
+  --on-status: #0c0e12;
+  --shadow: none;
+  color-scheme: dark;
+}
