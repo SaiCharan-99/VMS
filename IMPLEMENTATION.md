@@ -156,7 +156,8 @@ The pipeline returns this as a Pydantic model (`vms.analysis.result.AnalysisResu
   "metrics": {                               // flat dict of floats/ints/bools; rubric checks reference these keys
     "label_ratio": 0.31, "package_ratio": 0.72, "tag_ratio": 0.18, "product_ratio": 0.44,
     "avg_text_blocks": 6.2, "barcode_found": true, "duration_s": 42.3,
-    "estimated_sides": 5, "direction_changes": 4, "motion_ratio": 0.38, "max_label_hold_s": 2.7
+    "estimated_sides": 5, "direction_changes": 4, "motion_ratio": 0.38, "max_label_hold_s": 2.7,
+    "barcode_count": 1, "end_activity_ratio": 0.6, "quality_ok_ratio": 0.94, "frames_sampled": 127
   },
   "steps": [
     {
@@ -177,9 +178,28 @@ The pipeline returns this as a Pydantic model (`vms.analysis.result.AnalysisResu
   "decision": "Accepted",                    // Accepted | Review Required | Rejected
   "caps_applied": [],                        // e.g. ["no_barcode_max_review"]
   "summary": "Accepted after reviewing the return recording. …",
-  "timings_ms": { "sampling": 820, "detectors": 14230, "total": 15410 }
+  "timings_ms": { "sampling": 820, "detectors": 14230, "det_quality": 300, "det_motion": 1400, "det_objects": 5100,
+                  "det_barcode": 900, "det_ocr": 6530, "scoring": 1, "evidence": 8, "total": 15410 }
 }
 ```
+
+Metric keys (the canonical list is `vms.analysis.metrics.METRIC_KEYS`; rubrics may only reference these):
+
+| Key | Meaning |
+|---|---|
+| `label_ratio` / `package_ratio` / `tag_ratio` / `product_ratio` | Share of **quality-valid** frames where the signal fired |
+| `avg_text_blocks` | Mean EasyOCR text-box count over the frames where OCR ran (0 when OCR is off) |
+| `barcode_found` / `barcode_count` | Any / number of distinct decoded barcodes |
+| `duration_s` | Video duration |
+| `direction_changes` | Settled optical-flow direction changes (hysteresis 2 frames), all sampled frames |
+| `motion_ratio` | Share of sampled frames with high motion |
+| `estimated_sides` | `clamp(direction_changes + 1 (+2 if motion_ratio > 0.3), 0..6)`, 0 for no frames |
+| `end_activity_ratio` | Share of frames in the last 25% of the video with any motion (Forward sealing) |
+| `max_label_hold_s` | Longest run of valid frames with label + text visible (OCR count carried forward) |
+| `quality_ok_ratio` | Valid frames / sampled frames (used by the low-quality cap) |
+| `frames_sampled` | Number of sampled frames |
+
+Evidence `image` paths are relative to `VMS_DATA_DIR` when the evidence dir is inside it, otherwise relative to the evidence dir itself. `image` is `null` when no evidence dir was given. Steps list their evidence signal kinds in the rubric (`evidence: [barcode, label]`); one entry per step that had a firing signal.
 
 The legacy v1 shape (`scores.{shipping_label,unboxing,tags,product}.{score,notes}`) can be derived from v2. `routers/legacy.py` does this so old `/analyze` clients keep working.
 

@@ -6,7 +6,7 @@ from vms.config import get_settings
 
 IMPORT_CHECK = """
 import sys
-import vms, vms.analysis.legacy_analyzer, vms.api.main
+import vms, vms.analysis, vms.analysis.legacy_analyzer, vms.api.main, vms.cli
 print(",".join(m for m in ("easyocr", "ultralytics", "torch") if m in sys.modules))
 """
 

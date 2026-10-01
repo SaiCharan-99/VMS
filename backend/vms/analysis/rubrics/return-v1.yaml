@@ -1,0 +1,58 @@
+# Return (unboxing) SOP rubric. Thresholds carried over from the v1 analyzer.
+# Any change to checks or thresholds needs a new id (return-v2) so old analyses stay explainable.
+id: return-v1
+process_type: Return
+title: Return (Unboxing) SOP
+decision:
+  pass:   { min_score: 85, min_confidence: 0.70 }
+  review: { min_score: 50, min_confidence: 0.40 }
+caps:
+  - { id: no_barcode_max_review,  when: { metric: barcode_found,    op: "==", value: false }, max_status: review }
+  - { id: low_quality_max_review, when: { metric: quality_ok_ratio, op: "<",  value: 0.5 },   max_status: review }
+  - { id: too_short_fail,         when: { metric: duration_s,       op: "<",  value: 3 },     max_status: fail }
+steps:
+  - key: shipping_label
+    title: Shipping Label & Barcode
+    description: Outer AWB label held clearly toward camera before opening
+    evidence: [barcode, label]
+    checks:
+      - { key: label_text_visible, metric: avg_text_blocks,  op: ">",  value: 5,    points: 10, fail_note: "No clear text/label detected. Hold label closer." }
+      - { key: label_held,         metric: max_label_hold_s, op: ">=", value: 2.0,  points: 5,  fail_note: "Label not held steady for 2 seconds." }
+      - { key: barcode_read,       metric: barcode_found,    op: "==", value: true, points: 15, fail_note: "Barcode not read. Ensure it is in focus." }
+  - key: unboxing
+    title: Package Seal & Unboxing
+    description: Seal inspected for tampering, package opened fully on camera, all 6 sides shown
+    evidence: [package]
+    checks:
+      - { key: package_visible, metric: package_ratio,   op: ">",  value: 0.4, points: 6,  fail_note: "Package not consistently visible." }
+      - key: six_sides
+        metric: estimated_sides
+        op: ">="
+        value: 6
+        points: 10
+        fail_note: "Show all 6 sides of the package before opening."
+        partial:
+          - { op: ">=", value: 4, points: 6 }
+          - { op: ">=", value: 2, points: 3 }
+      - { key: long_enough,     metric: duration_s,      op: ">",  value: 10,  points: 4,  fail_note: "Video too short for full process." }
+  - key: tags
+    title: Brand Tag & Hangtag
+    description: Brand labels and price tags shown close to camera
+    evidence: [tag, text]
+    checks:
+      - { key: tag_visible,  metric: tag_ratio,       op: ">", value: 0.1, points: 15, fail_note: "Brand tag not detected clearly." }
+      - { key: tag_readable, metric: avg_text_blocks, op: ">", value: 3,   points: 10, fail_note: "Tag text not readable." }
+  - key: product
+    title: Product Condition
+    description: Item fully unfolded, both sides shown, checked for damage or fraud
+    evidence: [product]
+    checks:
+      - { key: product_visible, metric: product_ratio,     op: ">",  value: 0.4, points: 20, fail_note: "Product not visible enough." }
+      - key: product_turned
+        metric: direction_changes
+        op: ">="
+        value: 2
+        points: 5
+        fail_note: "Turn the product to show both sides."
+        partial:
+          - { op: ">=", value: 1, points: 2 }

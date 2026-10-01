@@ -14,7 +14,25 @@ class Settings(BaseSettings):
     ocr_enabled: bool = True
     yolo_enabled: bool = True
     process_fps: int = 3
+    analysis_width: int = 640
     blur_threshold: float = 30.0
+    min_brightness: float = 40.0
+    max_brightness: float = 250.0
+    ocr_every_n: int = 3
+    # Text detection runs on a smaller copy: ~0.40 s vs ~0.70 s per frame at 640 on CPU.
+    ocr_width: int = 480
+    yolo_conf: float = 0.35
+    # COCO stopgap until the Phase 6 custom model: class name -> role ("product" | "package").
+    yolo_class_map: dict[str, str] = {
+        "handbag": "product",
+        "backpack": "product",
+        "tie": "product",
+        "umbrella": "product",
+        "teddy bear": "product",
+        "suitcase": "package",
+    }
+    # COCO has no apparel classes, so the contour heuristic still counts as "product".
+    heuristic_product_fallback: bool = True
     max_upload_mb: int = 500
 
     @property
