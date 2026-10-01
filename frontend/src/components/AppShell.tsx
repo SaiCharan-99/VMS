@@ -59,7 +59,7 @@ function GlobalSearch() {
     <form
       role="search"
       onSubmit={submit}
-      className="hidden w-[280px] items-center gap-2 rounded-ctl border border-border bg-surface-2 px-2.5 py-1.5 text-text-3 focus-within:outline focus-within:outline-2 focus-within:outline-accent md:flex"
+      className="hidden w-[280px] items-center gap-2 rounded-ctl border border-border bg-surface-2 px-2.5 py-1.5 text-text-3 focus-within:outline focus-within:outline-2 focus-within:outline-accent lg:flex"
     >
       <Search size={15} strokeWidth={2} aria-hidden />
       <input
@@ -88,7 +88,7 @@ export function AppShell() {
       >
         Skip to content
       </a>
-      <aside className="flex gap-0.5 overflow-x-auto border-b border-border bg-surface p-2 md:sticky md:top-0 md:h-screen md:flex-col md:overflow-visible md:border-b-0 md:border-r md:px-3 md:py-[18px]">
+      <aside className="flex items-center gap-0.5 overflow-x-auto md:items-stretch border-b border-border bg-surface p-2 md:sticky md:top-0 md:h-screen md:flex-col md:overflow-visible md:border-b-0 md:border-r md:px-3 md:py-[18px]">
         <div className="hidden items-center gap-2.5 px-2.5 pb-[18px] pt-1 font-semibold md:flex">
           <div className="grid h-7 w-7 place-items-center rounded-[7px] bg-accent text-[13px] font-bold text-on-accent">
             V

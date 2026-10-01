@@ -35,7 +35,7 @@ export function DataTable<T>({
   caption: string;
 }) {
   const cellCls = (c: Column<T>) =>
-    cn("px-[18px]", c.numeric && "tabular text-right", c.secondary && "hidden md:table-cell");
+    cn("px-3 first:pl-4 last:pr-4 md:px-[18px] md:first:pl-[18px] md:last:pr-[18px]", c.numeric && "tabular text-right", c.secondary && "hidden md:table-cell");
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse">

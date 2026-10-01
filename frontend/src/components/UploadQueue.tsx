@@ -76,36 +76,36 @@ export function UploadQueue({
       {items.map((item, i) => (
         <li
           key={item.id}
-          className={`grid grid-cols-1 items-center gap-2 px-[18px] py-3 md:grid-cols-[minmax(0,1fr)_160px_minmax(140px,auto)_auto] md:gap-4 ${i ? "border-t border-border" : ""}`}
+          className={`grid grid-cols-1 items-center gap-2 px-[18px] py-3 xl:grid-cols-[minmax(0,1fr)_160px_minmax(150px,auto)] xl:gap-4 ${i ? "border-t border-border" : ""}`}
         >
-          <div className="min-w-0">
-            <div className="truncate font-medium">
-              {item.videoId && item.phase === "uploaded" ? (
-                <Link to={`/videos/${item.videoId}`} className="hover:underline">
-                  {item.file.name}
-                </Link>
-              ) : (
-                item.file.name
-              )}
+          <div className="flex min-w-0 items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="truncate font-medium">
+                {item.videoId && item.phase === "uploaded" ? (
+                  <Link to={`/videos/${item.videoId}`} className="hover:underline">
+                    {item.file.name}
+                  </Link>
+                ) : (
+                  item.file.name
+                )}
+              </div>
+              <div className="text-xs text-text-3">
+                {formatBytes(item.file.size)} · {item.settings.process_type}
+                {item.duplicate && " · already uploaded"}
+              </div>
             </div>
-            <div className="text-xs text-text-3">
-              {formatBytes(item.file.size)} · {item.settings.process_type}
-              {item.duplicate && " · already uploaded"}
-            </div>
-          </div>
-          <RowState item={item} />
-          <div className="hidden md:block">
             {(item.phase === "queued" || item.phase === "error") && (
               <button
                 type="button"
                 onClick={() => onRemove(item.id)}
                 aria-label={`Remove ${item.file.name}`}
-                className="rounded text-text-2 hover:text-text"
+                className="mt-0.5 rounded text-text-2 hover:text-text"
               >
                 <X size={16} aria-hidden />
               </button>
             )}
           </div>
+          <RowState item={item} />
         </li>
       ))}
     </ul>

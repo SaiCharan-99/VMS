@@ -1,5 +1,6 @@
-/* Design tokens: docs/UI_DESIGN.md §2. Deviation: --text-3 is darker than the spec
-   (#98a2b3 / #6b7380 fail WCAG AA for text); see PROGRESS.md → Decisions. */
+/* Design tokens: docs/UI_DESIGN.md §2. Deviations for WCAG AA text contrast (see PROGRESS.md →
+   Decisions): --text-3 is darker in both themes, light --pass is #0f7654 (spec #12805c), and
+   --on-accent / --on-status are dark in dark mode. */
 :root {
   --bg: #f7f8fa;
   --surface: #ffffff;
@@ -8,12 +9,12 @@
   --border-strong: #d0d5dd;
   --text: #101828;
   --text-2: #475467;
-  --text-3: #667085;
+  --text-3: #5f6b7e;
   --accent: #2f5bea;
   --accent-soft: #eef2ff;
   --accent-text: #2443b8;
   --on-accent: #ffffff;
-  --pass: #12805c;
+  --pass: #0f7654;
   --pass-soft: #e7f6ef;
   --review: #b54708;
   --review-soft: #fef4e6;

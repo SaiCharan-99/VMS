@@ -36,7 +36,7 @@ export function VerdictCard({
         </div>
         <div className="bg-surface px-[18px] py-3">
           <dt className="text-text-3">AWB</dt>
-          <dd className="mono m-0 mt-0.5 break-all font-semibold">{awb ?? "—"}</dd>
+          <dd className="mono m-0 mt-0.5 break-all font-medium">{awb ?? "—"}</dd>
         </div>
         <div className="col-span-2 bg-surface px-[18px] py-3 sm:col-span-1">
           <dt className="text-text-3">Frames OK</dt>

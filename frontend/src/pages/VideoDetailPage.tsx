@@ -93,7 +93,7 @@ function ResultFacts({ result }: { result: AnalysisResult }) {
             <ul className="m-0 grid list-none gap-1 p-0">
               {result.barcodes.map((b) => (
                 <li key={b.value} className="flex flex-wrap gap-x-2">
-                  <span className="mono font-semibold">{b.value}</span>
+                  <span className="mono font-medium">{b.value}</span>
                   <span className="text-text-2">
                     {b.symbology} · first at {formatDuration(b.first_seen_s)} · {b.frames_seen}{" "}
                     frames

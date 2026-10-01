@@ -13,11 +13,11 @@ const COLUMNS: Record<string, Column<Video>> = {
       <div className="flex min-w-0 items-center gap-2.5">
         <div
           aria-hidden
-          className="grid h-[30px] w-11 flex-none place-items-center rounded bg-surface-2 text-text-3"
+          className="hidden h-[30px] w-11 flex-none place-items-center rounded bg-surface-2 text-text-3 sm:grid"
         >
           <Film size={14} strokeWidth={1.8} />
         </div>
-        <span className="max-w-[220px] truncate font-medium md:max-w-[260px]">
+        <span className="block max-w-[150px] truncate font-medium sm:max-w-[220px] md:max-w-[260px]">
           {v.original_filename}
         </span>
       </div>

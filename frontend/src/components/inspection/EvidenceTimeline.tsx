@@ -23,6 +23,14 @@ export function EvidenceTimeline({
   onSeek: (t: number) => void;
 }) {
   const pct = (t: number) => (duration > 0 ? Math.min(100, Math.max(0, (t / duration) * 100)) : 0);
+  // Markers at (nearly) the same moment fan out sideways so each stays clickable.
+  const placed = [...markers]
+    .sort((a, b) => a.t - b.t || a.step - b.step)
+    .map((m, i, all) => {
+      let k = 0;
+      while (k < i && pct(m.t) - pct(all[i - k - 1]!.t) < 3) k++;
+      return { m, shiftPx: k * 16 };
+    });
   return (
     <div>
       <div className="relative mx-[11px] mt-3 h-[38px]">
@@ -31,7 +39,7 @@ export function EvidenceTimeline({
           className="absolute left-0 top-[17px] h-1 rounded-full bg-accent"
           style={{ width: `${pct(current)}%` }}
         />
-        {markers.map((m) => (
+        {placed.map(({ m, shiftPx }) => (
           <button
             key={m.id}
             type="button"
@@ -39,7 +47,7 @@ export function EvidenceTimeline({
             title={`${m.label} · ${formatDuration(m.t)}`}
             aria-label={`Jump to ${formatDuration(m.t)}: step ${m.step}, ${m.label}`}
             className={`absolute top-2 -ml-[11px] grid h-[22px] w-[22px] place-items-center rounded-full border-2 border-surface text-[10px] font-bold text-on-status transition-transform hover:scale-110 ${BG[m.status]}`}
-            style={{ left: `${pct(m.t)}%` }}
+            style={{ left: `calc(${pct(m.t)}% + ${shiftPx}px)` }}
           >
             {m.step}
           </button>
