@@ -2,7 +2,7 @@
 
 > **Every session:** read this after CLAUDE.md. **Before ending a session:** update the status table, tick tasks, add a session log entry, record decisions and known issues, and write handoff notes. The next session has no other memory.
 
-## Current phase: **Phase 3 — Auth, roles, audit** (not started; Phase 2 done)
+## Current phase: **Phase 4 — Web frontend (core)** (not started; Phase 3 done)
 
 ## Phase status
 
@@ -12,8 +12,8 @@
 | 0 | Foundation & cleanup | [PHASE_0](docs/phases/PHASE_0_foundation.md) | ✅ done | `phase-0-foundation` | 2026-10-01 |
 | 1 | Analysis engine v2 | [PHASE_1](docs/phases/PHASE_1_analysis_engine.md) | ✅ done | `phase-1-analysis-engine` | 2026-10-01 |
 | 2 | Data layer, jobs, API v1 | [PHASE_2](docs/phases/PHASE_2_data_jobs_api.md) | ✅ done | `phase-2-data-jobs-api` | 2026-10-01 |
-| 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ⏳ next | `phase-3-auth-users` | |
-| 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ⬜ | `phase-4-frontend` | |
+| 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ✅ done | `phase-3-auth-users` | 2026-10-01 |
+| 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ⏳ next | `phase-4-frontend` | |
 | 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⬜ | `phase-5-review-reports-admin` | |
 | 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⬜ | `phase-6-ml` | |
 | 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ⬜ | `phase-7-production` | |
@@ -31,6 +31,20 @@ Dependencies: 0 → 1 → 2 → 3 → 4 → 5. Phase 6 needs 1 and 2 (it's bette
 ## Current-phase task checklist
 
 Copy the task list from the current phase doc here at session start, and tick items as you go.
+
+Phase 3 (all done):
+- [x] Deps: pyjwt, argon2-cffi
+- [x] Settings: `env` (dev), `jwt_secret` (required, ≥32 chars, outside dev; dev auto-generates + warns), `jwt_ttl_hours` (12), `login_max_failures` (10), `login_window_s` (900)
+- [x] `vms/security.py` (argon2, JWT, API-key sha256); `services/users.py`, `services/api_keys.py`, `services/principal.py`, `services/demo.py`
+- [x] `deps.get_current_principal` (Bearer JWT or `X-API-Key`), `require_role`, `any_role` / `reviewer_up` / `admin_only`, `require_user`, `require_api_key`; inactive → 401
+- [x] Routers `auth` (login, me, change-password) and `admin` (users, warehouses, stations, api-keys, audit-log)
+- [x] Guards on every route per §8; operator + API-key isolation (403 on others' video/stream/job/evidence)
+- [x] Audit: `auth.login`, `auth.login_failed`, `video.*`, `user.created/updated/deactivated/password_changed`, `warehouse.created`, `station.created`, `api_key.created/revoked` (reviews come with Phase 5)
+- [x] System-admin stub removed; `system` user kept (no password, can't log in)
+- [x] CLI `create-admin`, `seed-demo` (dev only, idempotent)
+- [x] Login rate limit (in-memory) → 429
+- [x] Tests: `test_auth.py` (23) + `test_role_matrix.py` (27 routes × 5 callers + a coverage check). Suite: 244 passed
+- [x] Acceptance 1–4 verified (see session log)
 
 Phase 2 (all done):
 - [x] Deps: sqlalchemy, alembic in core; `[postgres]` extra (psycopg[binary])
@@ -108,6 +122,16 @@ Phase 0 (all done):
 | 2026-10-01 | 2 | Layout deviations from §4: no `db/base.py` (Base lives in `models.py`), `api/schemas.py` is one module, `api/views.py` holds ORM → response helpers, and there are extra routers `evidence.py` and `rubrics.py`. Also implemented `POST /videos/{id}/reanalyze` and soft `DELETE /videos/{id}` (role checks come in Phase 3). | Small modules. These endpoints were trivial once the services existed. |
 | 2026-10-01 | 2 | The default `VMS_DB_URL` is now `sqlite:///data/vms.db`. `audit_results.db` is only read by `import-legacy`. | The new schema lives under `data/`. |
 
+| 2026-10-01 | 3 | Branched `phase-3-auth-users` from `phase-2-data-jobs-api` | Earlier phases still aren't merged into `main`. |
+| 2026-10-01 | 3 | Migration `0002` adds `videos.api_key_id` (FK, indexed) | An API key acts as an operator; isolation needs to know which key uploaded what (`uploaded_by` is NULL for key uploads). |
+| 2026-10-01 | 3 | Legacy `POST /analyze` / `GET /results` accept **API keys only** (JWT users get 403), and `/results` lists only that key's uploads | §8 says "api key"; operator-style isolation. Imported legacy rows are visible to reviewers/admins via `/api/v1/videos`. |
+| 2026-10-01 | 3 | `/auth/me` and `/auth/change-password` need a user (API key → 403) | An API key has no profile. |
+| 2026-10-01 | 3 | The JWT carries only `sub` + `exp`/`iat`; role and `is_active` are read from the DB on every request | Role changes and deactivation take effect immediately. |
+| 2026-10-01 | 3 | API keys: `vms_` + 32 random bytes, stored as sha256 (not argon2) | High-entropy keys; a fast hash allows lookup by hash. |
+| 2026-10-01 | 3 | Admin can't demote or deactivate themselves (400) | Avoids locking out the last admin. |
+| 2026-10-01 | 3 | Upload with an unknown `station_id` → 400 (was a FK 500) | Small fix while touching the route. |
+| 2026-10-01 | 3 | Role-matrix coverage reads routes from OpenAPI (+ hidden root `/health`) | FastAPI 0.142 nests included routers (`_IncludedRouter`), so `app.routes` has no `APIRoute`s. |
+
 ## Open questions for the user (from IMPLEMENTATION.md §11)
 
 1. Is there an official SOP document? — _unanswered_
@@ -128,6 +152,10 @@ Phase 0 (all done):
 - Starlette spools multipart uploads to a temp file before the handler runs, so the size limit is enforced while copying to storage, not during the network transfer. A reverse-proxy body limit (Phase 7) should cap it earlier.
 - Dedupe is check-then-insert, so two identical uploads at the same instant can both be stored. Low risk. A unique partial index on `sha256` could fix it later.
 - `audit_results.db` on this machine has **0 rows**, so `import-legacy` imported nothing (it was tested with a synthetic legacy DB).
+- Login rate limiting is **in-memory per process** (resets on restart, not shared across workers/instances). Phase 7 should move it to the DB/Redis or the reverse proxy.
+- In dev without `VMS_JWT_SECRET`, each process makes a random secret, so tokens die on every `uvicorn --reload` restart. Set `VMS_JWT_SECRET` in `.env` to avoid re-logging in.
+- Tokens aren't revoked on password change (they expire after `jwt_ttl_hours`). Deactivation does cut them off immediately.
+- Station/warehouse **update/delete** endpoints don't exist yet (§8 lists only GET/POST); add in Phase 5 if the admin UI needs them.
 - Stale jobs are re-queued at the start of each worker loop iteration, so nothing reaps them while every worker is busy.
 
 ## Session log
@@ -143,6 +171,11 @@ Phase 0 (all done):
 - `pytest -m models`: 1 passed (~11 s). Streamlit app loads without errors.
 - Smoke-tested `uvicorn vms.api.main:app` live: `/health` OK, `/analyze` returns the v1 shape with `direction_changes`.
 
+### 2026-10-01 — Phase 3 session
+- Baseline 85 passed. Branch `phase-3-auth-users`. Installed pyjwt 2.15.1, argon2-cffi 25.1.0.
+- Built auth/roles/admin/audit/CLI. Fast suite: **244 passed in ~25 s** (tests use cheap argon2 params). `ruff check` / `ruff format` clean.
+- **Live acceptance** (scratch DB): `alembic upgrade head` ran 0001 → 0002; `create-admin` → login → `/auth/me` returned the admin with `last_login_at`; `seed-demo` printed the demo logins; `/api/v1/videos` without creds → 401, `/api/v1/health` → 200. Acceptance (1) and (2) are enforced by `test_role_matrix.py`.
+
 ### 2026-10-01 — Phase 2 session
 - Baseline 57 passed. Branch `phase-2-data-jobs-api` (from `phase-1-analysis-engine`). Installed sqlalchemy 2.1.1 and alembic 1.20.0.
 - Built db/storage/services/worker/API v1/legacy import. Fast suite: **85 passed in ~11 s**. `-m models`: 1 passed. `ruff check` / `ruff format --check` clean.
@@ -157,7 +190,26 @@ Phase 0 (all done):
 
 ## Handoff notes for next session
 
-**Start Phase 3 (auth, roles, audit).** State after Phase 2:
+**Start Phase 4 (web frontend).** State after Phase 3:
+- Setup: `pip install -e "backend[dev]"` (adds pyjwt, argon2-cffi), then `alembic -c backend/alembic.ini upgrade head` (new migration `0002`). Put `VMS_JWT_SECRET=<32+ chars>` in `.env` so tokens survive reloads.
+- **Demo credentials** (`python -m vms.cli seed-demo`, dev only; warehouse `DEMO`, stations `ST-1`, `ST-2`):
+
+  | Role | Email | Password |
+  |---|---|---|
+  | operator | operator@vms.local | operator-demo-1 |
+  | reviewer | reviewer@vms.local | reviewer-demo-1 |
+  | admin | admin@vms.local | admin-demo-1 |
+
+  Real admins: `python -m vms.cli create-admin --email … --name …` (prompts for the password).
+- Login: `POST /api/v1/auth/login {email, password}` → `{access_token, token_type: "bearer", expires_in, user}`. Send `Authorization: Bearer <token>`. 401 → redirect to login; 429 → show "too many attempts". `GET /auth/me` returns `UserOut` (`id, email, name, role, warehouse_id, is_active, created_at, last_login_at`). There's no refresh token: re-login after `expires_in` (12 h).
+- **Role matrix** (§8, enforced by `tests/test_role_matrix.py`): public = `/health`, `/auth/login`; any user = `/auth/me`, `/auth/change-password`; any user or API key = upload, list, video detail/stream, job, evidence, rubrics (operators and keys only their own; 403 otherwise); reviewer+ = reanalyze; admin = `DELETE /videos/{id}` and all `/admin/*`; API key only = legacy `/analyze`, `/results`. Hide UI actions by role, but rely on the API for enforcement.
+- `<video>` and `<img>` tags can't send an `Authorization` header. The stream and evidence URLs need auth, so the frontend must fetch them as blobs (or Phase 4 adds a short-lived signed URL / cookie). Decide and record it.
+- §8 changes: `POST /auth/change-password`, `PATCH /admin/users/{id}`, `DELETE /admin/api-keys/{id}`, `GET /admin/audit-log`; `videos.api_key_id`. Phase 5 routes (`/review-queue`, `/videos/{id}/reviews`, `/reports/*`) must use `reviewer_up` from `vms.api.deps`, log `review.created` via `audit.log(..., **principal.actor)`, call `analyses.refresh_final_status`, and be added to `MATRIX` in the role-matrix test (it fails if a route is missing).
+- Tests: fixtures `client` (admin), `anon_client`, `api_client`, `make_user(role, email=None)`, `make_api_key()`, and helper `auth(user)` → headers (all in `tests/conftest.py`). Password for test users: `TEST_PASSWORD`.
+
+### Phase 2 handoff (kept for reference)
+
+State after Phase 2:
 - Run locally (PowerShell, repo root, venv active):
   ```powershell
   pip install -e "backend[dev,ml]"

@@ -249,7 +249,7 @@ users(id, email UNIQUE, name, password_hash, role ENUM(operator|reviewer|admin),
 api_keys(id, name, key_hash, created_by FK users, created_at, revoked_at)
 videos(id, uuid UNIQUE, original_filename, storage_key, sha256, size_bytes, content_type,
        process_type ENUM(Forward|Return), awb NULL, order_ref NULL,
-       uploaded_by FK users NULL, station_id FK NULL, source ENUM(web|api|legacy),
+       uploaded_by FK users NULL, api_key_id FK api_keys NULL (Phase 3), station_id FK NULL, source ENUM(web|api|legacy),
        duration_s NULL, created_at, deleted_at NULL,   -- soft delete (Phase 2)
        final_status ENUM(pending|pass|review|fail) -- denormalized: review override > latest analysis
        INDEX(awb), INDEX(created_at), INDEX(final_status), INDEX(sha256))
@@ -279,7 +279,8 @@ Review reason codes: `label_unclear`, `seal_not_shown`, `tags_not_shown`, `produ
 |---|---|---|
 | `GET /health` | public | `{status, version, db, detectors}` |
 | `POST /auth/login` | public | `{email, password}` → `{access_token, token_type, user}` |
-| `GET /auth/me` | any | |
+| `GET /auth/me` | any user (API keys get 403) | |
+| `POST /auth/change-password` | any user | `{current_password, new_password}` → 204 |
 | `POST /videos` | operator+ / api key | multipart `file`, `process_type`, optional `awb`, `order_ref`, `station_id`. Streams to storage (no full read into memory). Size limit `VMS_MAX_UPLOAD_MB` (default 500). Dedupes on sha256 (returns the existing video with `duplicate: true`). → `201 {video, job}` |
 | `GET /videos` | operator+ | filters: `status, process_type, awb, q, station_id, uploaded_by, date_from, date_to`, paging, `sort`. Operators see only their own uploads, reviewers and admins see all. |
 | `GET /videos/{id}` | operator+ | video + latest analysis (full result) + reviews + job |
@@ -292,13 +293,14 @@ Review reason codes: `label_unclear`, `seal_not_shown`, `tags_not_shown`, `produ
 | `POST /videos/{id}/reviews` | reviewer+ | `{final_status, reason_code, comment}` |
 | `GET /reports/summary` | reviewer+ | `date_from,date_to,group_by=day|station|operator|process_type` → counts, pass rate, avg score, top failed checks |
 | `GET /reports/export.csv` | reviewer+ | same filters as `GET /videos` |
-| `GET/POST/PATCH /admin/users` | admin | |
+| `GET/POST /admin/users`, `PATCH /admin/users/{id}` | admin | PATCH: `name, role, warehouse_id, is_active, password` (only sent fields). Admins can't demote/deactivate themselves. |
 | `GET/POST /admin/stations`, `/admin/warehouses` | admin | |
-| `GET/POST/DELETE /admin/api-keys` | admin | the key is shown once on creation |
+| `GET/POST /admin/api-keys`, `DELETE /admin/api-keys/{id}` | admin | the key is shown once on creation; DELETE revokes |
+| `GET /admin/audit-log` | admin | filters `action` (prefix), `entity_type, entity_id, actor_user_id, actor_api_key_id, date_from, date_to`; paginated, newest first |
 | `GET /rubrics` | any | active rubrics (for UI step labels and descriptions) |
-| `POST /analyze`, `GET /results` (root, legacy) | api key | Phase 2 compatibility shim. Synchronous, returns the v1 shape. Deprecated in Phase 7. |
+| `POST /analyze`, `GET /results` (root, legacy) | api key only | Scoped to the key's own uploads. Phase 2 compatibility shim. Synchronous, returns the v1 shape. Deprecated in Phase 7. |
 
-Auth header: `Authorization: Bearer <jwt>` or `X-API-Key: <key>`. Before Phase 3, `deps.get_current_user` returns a built-in system admin so routes can be written with their final signatures.
+Auth header: `Authorization: Bearer <jwt>` or `X-API-Key: <key>`. Phase 3: `deps.get_current_principal` resolves either; an API key acts as an `operator` (uploads get `source=api`, `api_key_id`) and sees only its own uploads. Operators see only their own uploads (403 on others' videos, streams, jobs, evidence). Login is rate limited: 10 failures per email+IP per 15 min → 429. Every route except `/health` and `/auth/login` returns 401 without credentials.
 
 ---
 
