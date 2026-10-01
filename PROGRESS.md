@@ -265,6 +265,7 @@ Phase 0 (all done):
   | v2 (`docs/eval/synthetic-v2.md`) | 0 % | 33 % | 83 % | n/a |
 
   v2 is lower on accuracy only because its extra checks need a custom model: one human-`review` video now scores below the review cutoff and is marked fail. **These numbers say nothing about real accuracy.** Calibration on the same data suggested `decision.review.min_score` 50 -> 60 for `return-v2` (cost 2 -> 0 on 4 videos); not applied, too few labels.
+- **First real footage (2 Forward videos, user-labelled pass; `data/samples/sample_{a,b}.mp4`, 25 s and 66 s):** `forward-v1` marks both **review** (80/100, no caps), `forward-v2` (no custom model) marks both review (62/100). False-pass rate n/a (no human non-pass labels), false-fail 0 %, review rate 100 %, status accuracy 0 %. Barcodes decoded in both; the only lost points are `label_text_visible` and `tag_readable`: the OCR text-box count averages 2.5-2.7 per frame against thresholds of >5 and >3. That is the known heuristic weakness (c): thresholds from v1 `readtext` counts don't fit `detect()` at 480 px. Report: `docs/eval/real-2videos-forward-v1.md`. Two videos can't justify changing thresholds; collect more passing videos before lowering the text thresholds, and keep checking false-pass on non-pass videos.
 
 ### 2026-10-01 — Phase 5 session
 - Baseline: 251 passed, **1 failed** (`test_jwt_secret_required_outside_dev`, caused by a developer `.env`); fixed in conftest → 252. Branch `phase-5-review-reports-admin`.
