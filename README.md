@@ -1,40 +1,36 @@
 # VMS SOP Analyzer
 
-This project provides a computer-vision SOP review tool for logistics inspection videos.
+Scores warehouse inspection videos (forward packing / return unboxing) against the VMS SOP
+rubric using computer vision, and returns **pass / review / fail**. The system is review-first:
+uncertain evidence becomes `review`, never `pass`.
 
-## Components
+Developer workflow, conventions and phase plan: see [CLAUDE.md](CLAUDE.md) and
+[PROGRESS.md](PROGRESS.md).
 
-- `vms_sop_analyzer.py`: core analysis engine
-- `app.py`: Streamlit demo UI
-- `server.py`: FastAPI backend for other applications
-- `audit_store.py`: SQLite-based result storage for review tracking
+## Layout
 
-## Run the API locally
-
-```bash
-pip install -r requirements.txt
-python server.py
+```
+backend/vms/            Python package (config, analysis, API, legacy store)
+backend/tests/          pytest suite (synthetic videos via tests/fixtures/video_factory.py)
+ml/                     training utilities (frame extraction)
+app.py                  Streamlit demo UI (retired in Phase 7)
 ```
 
-Then open:
+## Quickstart (PowerShell)
 
-- `http://localhost:8000/health`
-- `http://localhost:8000/docs`
+```powershell
+py -m venv .venv; .\.venv\Scripts\Activate.ps1
+pip install -e "backend[dev,ml]"          # drop ",ml" to skip EasyOCR/YOLO (tests still pass)
+pytest backend/tests -q                   # fast suite
+uvicorn vms.api.main:app --reload --port 8000   # http://localhost:8000/docs
+pip install streamlit pandas; streamlit run app.py
+```
+
+Settings come from `VMS_*` environment variables or a `.env` file (see `backend/vms/config.py`),
+e.g. `VMS_OCR_ENABLED=false`, `VMS_PROCESS_FPS=3`, `VMS_DB_URL=sqlite:///audit_results.db`.
 
 ## Example upload
 
 ```bash
-curl -X POST "http://localhost:8000/analyze" \
-  -F "file=@sample_video.mp4" \
-  -F "process_type=Return"
+curl -X POST "http://localhost:8000/analyze" -F "file=@sample_video.mp4" -F "process_type=Return"
 ```
-
-## Run the Streamlit UI
-
-```bash
-streamlit run app.py
-```
-
-## Production note
-
-This project is configured as a review-first system. Videos with uncertain detections are marked as `review` rather than being auto-approved.

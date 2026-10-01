@@ -2,7 +2,7 @@ import streamlit as st
 import tempfile, os
 import pandas as pd
 from datetime import datetime
-from vms_sop_analyzer import VMSSOPAnalyzer
+from vms.analysis.legacy_analyzer import VMSSOPAnalyzer
 
 st.set_page_config(page_title="VMS SOP Analyzer", page_icon="📦", layout="wide")
 
@@ -176,16 +176,16 @@ for uploaded in uploaded_files:
     with analysis_col:
         with st.spinner(f"Analyzing {uploaded.name}..."):
             try:
-                 result = VMSSOPAnalyzer(
-                blur_threshold=blur_threshold,
-                min_hold_sec=min_hold_sec,
-                process_type=process_type
-            ).analyze(tmp_path)
+                result = VMSSOPAnalyzer(
+                    blur_threshold=blur_threshold,
+                    min_hold_sec=min_hold_sec,
+                    process_type=process_type,
+                ).analyze(tmp_path)
             except Exception as e:
                 os.remove(tmp_path)
-                st.error(f"Could not analyze {uploaded.name}:{e}")
+                st.error(f"Could not analyze {uploaded.name}: {e}")
                 continue
-           
+
         os.remove(tmp_path)
 
         score   = result["total_score"]
