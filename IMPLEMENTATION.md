@@ -250,18 +250,22 @@ api_keys(id, name, key_hash, created_by FK users, created_at, revoked_at)
 videos(id, uuid UNIQUE, original_filename, storage_key, sha256, size_bytes, content_type,
        process_type ENUM(Forward|Return), awb NULL, order_ref NULL,
        uploaded_by FK users NULL, station_id FK NULL, source ENUM(web|api|legacy),
-       duration_s NULL, created_at,
+       duration_s NULL, created_at, deleted_at NULL,   -- soft delete (Phase 2)
        final_status ENUM(pending|pass|review|fail) -- denormalized: review override > latest analysis
-       INDEX(awb), INDEX(created_at), INDEX(final_status))
+       INDEX(awb), INDEX(created_at), INDEX(final_status), INDEX(sha256))
 jobs(id, video_id FK, status ENUM(queued|running|done|failed), attempts, max_attempts=3,
      progress REAL 0..1, error TEXT NULL, worker_id NULL, created_at, started_at, finished_at, heartbeat_at)
-analyses(id, uuid, video_id FK, job_id FK, schema_version, engine_version, rubric_id,
-         total_score, confidence, status, decision, result_json JSON, created_at)
+analyses(id, uuid, video_id FK, job_id FK NULL, schema_version, engine_version, rubric_id,
+         total_score, confidence, status, decision,
+         barcodes TEXT,                      -- space-separated decoded values, for `GET /videos?q=`
+         result_json JSON, created_at)       -- job_id NULL only for legacy imports
 evidence(id, analysis_id FK, step_key, kind, t_s, storage_key, created_at)
 reviews(id, analysis_id FK, video_id FK, reviewer_id FK, final_status ENUM(pass|fail), reason_code,
         comment, created_at)                 -- latest review per video wins
 audit_log(id, actor_user_id NULL, actor_api_key_id NULL, action, entity_type, entity_id, data JSON, created_at)
 ```
+
+Phase 2 notes: enums are stored as strings with CHECK constraints (no native Postgres enums). Timestamps are naive UTC; the API serializes them with a trailing `Z`. `videos.sha256` is indexed, not unique (legacy rows have none; dedupe happens in `services.videos`). Legacy imports have `storage_key`/`sha256` NULL and `source=legacy`; their analyses use `schema_version "1.0"`, `rubric_id "legacy-v1"`. The migration seeds the `system@vms.local` admin that stubbed auth uses.
 
 Job claiming must be atomic: `UPDATE jobs SET status='running', worker_id=:w, started_at=now WHERE id = (SELECT id FROM jobs WHERE status='queued' ORDER BY id LIMIT 1) AND status='queued'`, then check the rowcount. A job stuck `running` with `heartbeat_at` older than 5 min gets re-queued if `attempts < max_attempts`, otherwise marked `failed`.
 

@@ -10,7 +10,8 @@ Developer workflow, conventions and phase plan: see [CLAUDE.md](CLAUDE.md) and
 ## Layout
 
 ```
-backend/vms/            Python package (config, analysis, API, legacy store)
+backend/vms/            Python package (config, analysis, db, services, storage, worker, API)
+backend/alembic/        DB migrations
 backend/tests/          pytest suite (synthetic videos via tests/fixtures/video_factory.py)
 ml/                     training utilities (frame extraction)
 app.py                  Streamlit demo UI (retired in Phase 7)
@@ -22,15 +23,22 @@ app.py                  Streamlit demo UI (retired in Phase 7)
 py -m venv .venv; .\.venv\Scripts\Activate.ps1
 pip install -e "backend[dev,ml]"          # drop ",ml" to skip EasyOCR/YOLO (tests still pass)
 pytest backend/tests -q                   # fast suite
+alembic -c backend/alembic.ini upgrade head     # creates data/vms.db
 uvicorn vms.api.main:app --reload --port 8000   # http://localhost:8000/docs
+python -m vms.worker                      # second terminal: runs queued analyses
+python -m vms.cli import-legacy --db audit_results.db   # once: old results -> new DB
 pip install streamlit pandas; streamlit run app.py
 ```
 
 Settings come from `VMS_*` environment variables or a `.env` file (see `backend/vms/config.py`),
-e.g. `VMS_OCR_ENABLED=false`, `VMS_PROCESS_FPS=3`, `VMS_DB_URL=sqlite:///audit_results.db`.
+e.g. `VMS_OCR_ENABLED=false`, `VMS_PROCESS_FPS=3`, `VMS_DB_URL=sqlite:///data/vms.db`. See `.env.example`.
 
 ## Example upload
 
 ```bash
-curl -X POST "http://localhost:8000/analyze" -F "file=@sample_video.mp4" -F "process_type=Return"
+curl -F "file=@sample_video.mp4" -F "process_type=Return" http://localhost:8000/api/v1/videos   # 201 {video, job}
+curl http://localhost:8000/api/v1/jobs/1        # poll until status is done
+curl http://localhost:8000/api/v1/videos/1      # video + full result + evidence URLs
 ```
+
+The legacy synchronous `POST /analyze` and `GET /results` still work (v1 shape).

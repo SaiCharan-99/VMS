@@ -2,7 +2,7 @@
 
 > **Every session:** read this after CLAUDE.md. **Before ending a session:** update the status table, tick tasks, add a session log entry, record decisions and known issues, and write handoff notes. The next session has no other memory.
 
-## Current phase: **Phase 2 — Data layer, jobs, API v1** (not started; Phase 1 done)
+## Current phase: **Phase 3 — Auth, roles, audit** (not started; Phase 2 done)
 
 ## Phase status
 
@@ -11,8 +11,8 @@
 | — | Codebase analysis & planning | this file, IMPLEMENTATION.md | ✅ done | `main` | 2026-10-01 |
 | 0 | Foundation & cleanup | [PHASE_0](docs/phases/PHASE_0_foundation.md) | ✅ done | `phase-0-foundation` | 2026-10-01 |
 | 1 | Analysis engine v2 | [PHASE_1](docs/phases/PHASE_1_analysis_engine.md) | ✅ done | `phase-1-analysis-engine` | 2026-10-01 |
-| 2 | Data layer, jobs, API v1 | [PHASE_2](docs/phases/PHASE_2_data_jobs_api.md) | ⏳ next | `phase-2-data-jobs-api` | |
-| 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ⬜ | `phase-3-auth-users` | |
+| 2 | Data layer, jobs, API v1 | [PHASE_2](docs/phases/PHASE_2_data_jobs_api.md) | ✅ done | `phase-2-data-jobs-api` | 2026-10-01 |
+| 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ⏳ next | `phase-3-auth-users` | |
 | 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ⬜ | `phase-4-frontend` | |
 | 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⬜ | `phase-5-review-reports-admin` | |
 | 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⬜ | `phase-6-ml` | |
@@ -31,6 +31,20 @@ Dependencies: 0 → 1 → 2 → 3 → 4 → 5. Phase 6 needs 1 and 2 (it's bette
 ## Current-phase task checklist
 
 Copy the task list from the current phase doc here at session start, and tick items as you go.
+
+Phase 2 (all done):
+- [x] Deps: sqlalchemy, alembic in core; `[postgres]` extra (psycopg[binary])
+- [x] `vms/db/` models for all §7 tables (+ `videos.deleted_at`, `analyses.barcodes`), engine/session (SQLite WAL, busy timeout), `seed()` system admin
+- [x] Alembic (`backend/alembic.ini`, env reads settings) + `0001` initial migration that seeds the system admin; a test runs upgrade/downgrade on an empty DB
+- [x] `vms/storage.py` `Storage` protocol + `LocalStorage` (atomic `.part` writes, size limit, key validation)
+- [x] Services: `videos.create_from_upload` (stream, hash, dedupe, OpenCV probe, enqueue), `jobs.claim_next/heartbeat/complete/fail/release/requeue_stale`, `analyses.save_result`, `audit.log`, `legacy_import`
+- [x] `python -m vms.worker [--once] [--poll]`: stale requeue, claim, throttled progress heartbeats, graceful SIGINT/SIGTERM/SIGBREAK (job released back to queue)
+- [x] API: `create_app()`, routers health/videos/jobs/evidence/rubrics/legacy, stubbed `get_current_user`, Range streaming, CORS, filters + pagination + sort
+- [x] AWB filled from the first barcode when empty
+- [x] `python -m vms.cli import-legacy --db audit_results.db` (idempotent)
+- [x] `vms/legacy_store.py` removed
+- [x] Tests (85 fast): storage, migration, job queue (4-thread claim race, stale → requeue → failed, lost ownership, release), upload → worker → result, dedupe, 413, 400, corrupt → failed, shutdown release, filters/pagination, Range 206, reanalyze/delete, 404s, rubrics, OpenAPI paths, legacy `/analyze` + `/results`, legacy import
+- [x] Acceptance 1–4 verified live (see session log)
 
 Phase 1 (all done):
 - [x] `result.py` (schema 2.0 Pydantic models + `to_v1()`)
@@ -84,6 +98,16 @@ Phase 0 (all done):
 | 2026-10-01 | 1 | `caps_applied` lists only caps that actually lowered the status. A cap whose metric is missing applies. | Clear audit meaning; review-first. |
 | 2026-10-01 | 1 | Metrics added beyond §5: `barcode_count`, `end_activity_ratio`, `quality_ok_ratio`, `frames_sampled`. The evidence path rule and per-detector timings are documented in IMPLEMENTATION.md §5. | Needed by rubrics and caps; contract documented. |
 
+| 2026-10-01 | 2 | Branched `phase-2-data-jobs-api` from `phase-1-analysis-engine` | Phases 0/1 still aren't merged into `main`. |
+| 2026-10-01 | 2 | Schema additions to §7: `videos.deleted_at` (soft delete), `analyses.barcodes` (space-joined values for `q` search), `analyses.job_id` nullable (legacy imports), `videos.sha256` indexed but not unique. Enums are strings + CHECK constraints. Timestamps are naive UTC, serialized with `Z`. | Documented in IMPLEMENTATION.md §7. Avoids native Postgres enums and JSON-text search. |
+| 2026-10-01 | 2 | A duplicate upload returns **200** `{video, job, duplicate: true}` (a new upload returns 201) | Nothing was created, so 201 would be misleading. |
+| 2026-10-01 | 2 | Analysis exceptions fail the job at once (no retry). `max_attempts` only bounds stale/lost-worker retries. | A corrupt video fails the same way every time. |
+| 2026-10-01 | 2 | Graceful shutdown releases the running job back to `queued` without counting the attempt, and deletes partial evidence | Restarting a worker shouldn't burn attempts. |
+| 2026-10-01 | 2 | Legacy `POST /analyze` stores the upload (`source=api`) and runs the job inline (`worker_id api-sync:*`, `max_attempts=1`). `GET /results` reads `analyses` (row `id` = analysis id, `result_json` = v1 JSON). | The phase doc says the legacy routes read the new tables. |
+| 2026-10-01 | 2 | The pipeline writes evidence JPEGs straight to `storage.path("evidence/<uuid>")` | Works for `LocalStorage` only. An S3 backend will need an upload step after analysis. |
+| 2026-10-01 | 2 | Layout deviations from §4: no `db/base.py` (Base lives in `models.py`), `api/schemas.py` is one module, `api/views.py` holds ORM → response helpers, and there are extra routers `evidence.py` and `rubrics.py`. Also implemented `POST /videos/{id}/reanalyze` and soft `DELETE /videos/{id}` (role checks come in Phase 3). | Small modules. These endpoints were trivial once the services existed. |
+| 2026-10-01 | 2 | The default `VMS_DB_URL` is now `sqlite:///data/vms.db`. `audit_results.db` is only read by `import-legacy`. | The new schema lives under `data/`. |
+
 ## Open questions for the user (from IMPLEMENTATION.md §11)
 
 1. Is there an official SOP document? — _unanswered_
@@ -100,7 +124,11 @@ Phase 0 (all done):
 - Fixed in Phase 0: models loading at import, OCR cadence, free +5, hard-coded sides.
 - `app.py` is not covered by ruff (legacy, retired in Phase 7).
 - FastAPI's TestClient emits a Starlette deprecation warning about `httpx` (harmless).
-- (baseline) The Streamlit app doesn't persist results. The API is synchronous and reads uploads into memory. → Phases 2 and 4.
+- Fixed in Phase 2: the API is async (job queue) and persists everything. The Streamlit app still doesn't persist results (retired in Phase 7).
+- Starlette spools multipart uploads to a temp file before the handler runs, so the size limit is enforced while copying to storage, not during the network transfer. A reverse-proxy body limit (Phase 7) should cap it earlier.
+- Dedupe is check-then-insert, so two identical uploads at the same instant can both be stored. Low risk. A unique partial index on `sha256` could fix it later.
+- `audit_results.db` on this machine has **0 rows**, so `import-legacy` imported nothing (it was tested with a synthetic legacy DB).
+- Stale jobs are re-queued at the start of each worker loop iteration, so nothing reaps them while every worker is busy.
 
 ## Session log
 
@@ -115,6 +143,12 @@ Phase 0 (all done):
 - `pytest -m models`: 1 passed (~11 s). Streamlit app loads without errors.
 - Smoke-tested `uvicorn vms.api.main:app` live: `/health` OK, `/analyze` returns the v1 shape with `direction_changes`.
 
+### 2026-10-01 — Phase 2 session
+- Baseline 57 passed. Branch `phase-2-data-jobs-api` (from `phase-1-analysis-engine`). Installed sqlalchemy 2.1.1 and alembic 1.20.0.
+- Built db/storage/services/worker/API v1/legacy import. Fast suite: **85 passed in ~11 s**. `-m models`: 1 passed. `ruff check` / `ruff format --check` clean.
+- **Live acceptance** (scratch DB, `VMS_JOB_STALE_S=10`, OCR+YOLO on, 30 s 1280×720 synthetic video): (1) `curl -F file=@x.mp4 -F process_type=Return …/api/v1/videos` → **201 in 0.30 s**. The job was polled to `done`, and `/videos/1` showed `review 60/100`, the auto-filled AWB `AWB-E2E-1`, and 4 evidence URLs serving JPEGs. A Range request returned 206. (2) The worker was hard-killed (`Stop-Process -Force`) at 33 % progress, leaving the job `running`. The restarted worker logged `Stale jobs: 1 re-queued` and reran it (attempt 2) to `done` (~25 s analysis). (3) `/docs` returned 200, and a test checks that OpenAPI lists every Phase 2 path with typed response models. (4) Tests and ruff green.
+- `import-legacy` on the real `audit_results.db` found 0 rows to import (the file was opened read-only).
+
 ### 2026-10-01 — Phase 1 session
 - Baseline 16 passed. Branch `phase-1-analysis-engine` (from `phase-0-foundation`).
 - Built the v2 pipeline, rubrics, CLI, and tests. Fast suite: **57 passed in ~8 s**. `-m models`: 1 passed (~16 s). `ruff check` / `ruff format` clean.
@@ -122,6 +156,26 @@ Phase 0 (all done):
 - Acceptance: (1) the CLI writes a schema-valid result and 4 evidence JPEGs ✔. (2) `test_yaml_threshold_change_changes_score` ✔. (3) `test_shipped_caps_block_pass` plus the pipeline dark/blur tests ✔. (4) suite 8 s; 60 s video 45 s ✔. (5) `/analyze` is covered by `test_api.py` (v1 shape). `app.py` was verified headless with Streamlit AppTest and a stubbed upload in both modes (no exceptions; titles and CSV columns come from the rubric) ✔.
 
 ## Handoff notes for next session
+
+**Start Phase 3 (auth, roles, audit).** State after Phase 2:
+- Run locally (PowerShell, repo root, venv active):
+  ```powershell
+  pip install -e "backend[dev,ml]"
+  alembic -c backend/alembic.ini upgrade head          # creates data/vms.db (+ system admin)
+  uvicorn vms.api.main:app --reload --port 8000        # http://localhost:8000/docs
+  python -m vms.worker                                 # 2nd terminal; Ctrl+C releases the job
+  python -m vms.cli import-legacy --db audit_results.db
+  curl.exe -F file=@x.mp4 -F process_type=Return localhost:8000/api/v1/videos
+  ```
+- New env vars (in `.env.example`): `VMS_CORS_ORIGINS`, `VMS_WORKER_POLL_S` (1.5), `VMS_JOB_STALE_S` (300), `VMS_JOB_MAX_ATTEMPTS` (3). The `VMS_DB_URL` default changed to `sqlite:///data/vms.db`. `Settings.sqlite_path` was removed.
+- Auth stub: `vms.api.deps.get_current_user` returns the seeded `system@vms.local` admin (`vms.db.session.seed`). Every route already depends on it. Phase 3 replaces its body with JWT / `X-API-Key` resolution and adds role checks (`reanalyze` reviewer+, `DELETE` admin). Operators see only their own videos: `services.videos.list_query` already filters by `uploaded_by` for `Role.operator`. Upload `source` is hard-coded to `web` in `routers/videos.py`; set it to `api` for API-key callers. The legacy routes need the API-key dependency.
+- The `users`, `api_keys`, `warehouses`, `stations`, `reviews`, and `audit_log` tables already exist, so Phase 3 needs no migration unless columns change. `password_hash` is nullable (the system user has none).
+- `services.audit.log(session, action, entity_type, entity_id, data, actor_user_id=..., actor_api_key_id=...)` is called for `video.uploaded`, `video.deleted`, `video.reanalyze`, `analysis.completed`, `analysis.failed`, and `legacy.imported`. Worker-side entries have no actor.
+- `services.analyses.refresh_final_status(session, video)` already applies "latest review wins". Call it after inserting a review (Phase 5).
+- Tests: the `client` fixture (`tests/conftest.py`) builds `create_app()` on a per-test SQLite DB via `create_all()`, and `db_ready` gives just the tables. `conftest` clears the `get_engine`/`get_sessionmaker` caches (and disposes the engine) around each test, so clear any new cached singleton there too. Run the worker in tests with `Worker().run_once()`.
+- Video IDs in URLs are integer ids. `uuid` is also returned.
+
+### Phase 1 handoff (kept for reference)
 
 **Start Phase 2.** State after Phase 1:
 - Entry point: `from vms.analysis import analyze_video` → `analyze_video(path, process_type, *, settings=None, evidence_dir=None, progress_cb=None) -> AnalysisResult`. Store `result.model_dump_json()` in `analyses.result_json`. The worker should pass `evidence_dir = data_dir / "evidence" / <analysis uuid>` so image paths come out as `evidence/<uuid>/<step>_0.jpg` (relative to `VMS_DATA_DIR`).
