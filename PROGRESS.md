@@ -2,7 +2,7 @@
 
 > **Every session:** read this after CLAUDE.md. **Before ending a session:** update the status table, tick tasks, add a session log entry, record decisions and known issues, and write handoff notes. The next session has no other memory.
 
-## Current phase: **Phase 4 — Web frontend (core)** (not started; Phase 3 done)
+## Current phase: **Phase 5 — Review workflow, reports, admin** (not started; Phase 4 done)
 
 ## Phase status
 
@@ -13,8 +13,8 @@
 | 1 | Analysis engine v2 | [PHASE_1](docs/phases/PHASE_1_analysis_engine.md) | ✅ done | `phase-1-analysis-engine` | 2026-10-01 |
 | 2 | Data layer, jobs, API v1 | [PHASE_2](docs/phases/PHASE_2_data_jobs_api.md) | ✅ done | `phase-2-data-jobs-api` | 2026-10-01 |
 | 3 | Auth, roles, audit | [PHASE_3](docs/phases/PHASE_3_auth_users.md) | ✅ done | `phase-3-auth-users` | 2026-10-01 |
-| 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ⏳ next | `phase-4-frontend` | |
-| 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⬜ | `phase-5-review-reports-admin` | |
+| 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ✅ done | `phase-4-frontend` | 2026-10-01 |
+| 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⏳ next | `phase-5-review-reports-admin` | |
 | 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⬜ | `phase-6-ml` | |
 | 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ⬜ | `phase-7-production` | |
 
@@ -31,6 +31,22 @@ Dependencies: 0 → 1 → 2 → 3 → 4 → 5. Phase 6 needs 1 and 2 (it's bette
 ## Current-phase task checklist
 
 Copy the task list from the current phase doc here at session start, and tick items as you go.
+
+Phase 4 (all done):
+- [x] Scaffold `frontend/`: Vite 6 + React 18 + TS strict, Tailwind 3, React Router 6, TanStack Query 5, zod, ESLint 9 (+jsx-a11y) + Prettier, Vitest + Testing Library + MSW. Proxy `/api` → :8000
+- [x] Tokens (`src/styles/tokens.css`, light + dark), Tailwind theme mapped to tokens, Inter + JetBrains Mono (@fontsource), lucide-react; primitives in `src/components/ui/`; dev-only `/_ui` gallery
+- [x] `src/api/client.ts` (VITE_API_URL, bearer, 401 → logout + redirect, typed `ApiError`, zod validation, XHR upload with progress); `src/types/analysis.ts` (§5) + `api.ts`
+- [x] Auth: `/login`, token in memory + localStorage (try/catch), `AuthProvider`, `RequireRole`, role-filtered nav
+- [x] App shell (232px sidebar, top bar with AWB search, theme toggle, Upload); responsive to 375px
+- [x] `/upload`: drag-and-drop multi-file, Forward/Return, station, AWB, order ref, ≤2 concurrent XHR uploads, job polling every 2 s → result badge + link, compression tips
+- [x] `/videos`: status/type/date/search filters synced to the URL, pagination, badges
+- [x] `/videos/:id`: player (Space, J/K), evidence timeline (click → seek), verdict card, step cards with checks/details/evidence thumbnails, barcodes + quality, Re-analyze (reviewer+), pending/failed/legacy states
+- [x] `/` dashboard v1: today's counts, pass rate, awaiting review, analyzing now, recent uploads
+- [x] Empty / loading (skeletons) / error (Retry) states
+- [x] Backend: signed media URLs, `GET /stations`, `uploaded_by_name` (rubrics + CORS already existed)
+- [x] Tests: StepCard, StatusBadge (verdict), upload queue reducer, API client errors, VideosPage + VideoDetailPage with MSW (18 frontend tests); backend 252 passed
+- [x] CLAUDE.md commands + README updated; Streamlit marked deprecated
+- [x] Acceptance 1–5 verified (see session log)
 
 Phase 3 (all done):
 - [x] Deps: pyjwt, argon2-cffi
@@ -131,6 +147,14 @@ Phase 0 (all done):
 | 2026-10-01 | 3 | Admin can't demote or deactivate themselves (400) | Avoids locking out the last admin. |
 | 2026-10-01 | 3 | Upload with an unknown `station_id` → 400 (was a FK 500) | Small fix while touching the route. |
 | 2026-10-01 | 3 | Role-matrix coverage reads routes from OpenAPI (+ hidden root `/health`) | FastAPI 0.142 nests included routers (`_IncludedRouter`), so `app.routes` has no `APIRoute`s. |
+| 2026-10-01 | 4 | Branched `phase-4-frontend` from `phase-3-auth-users` | Earlier phases still aren't merged into `main`. |
+| 2026-10-01 | 4 | Media auth = **signed URLs**: `stream_url` and evidence `url` carry `?exp=&sig=` (HMAC-SHA256 of path+exp with the JWT secret, TTL `VMS_MEDIA_URL_TTL_S` = 6 h). `deps.media_access` accepts a valid signature or normal auth. | `<video>`/`<img>` can't send headers; blob-fetching 500 MB videos breaks Range seeking. A URL only works for the path it was issued for. After 6 h on one page, reload. |
+| 2026-10-01 | 4 | Added `GET /api/v1/stations` (any role) and `VideoOut.uploaded_by_name` | Operators can't call `/admin/stations`; the Inspections table needs an operator name. Additive, no schema bump. |
+| 2026-10-01 | 4 | Token contrast deviations from UI_DESIGN §2: `--text-3` light `#5f6b7e` (spec `#98a2b3`), dark `#8a93a1` (spec `#6b7380`); light `--pass` `#0f7654` (spec `#12805c`, 4.41:1 on pass-soft); new `--on-accent`/`--on-status` (white in light, `#0c0e12` in dark, since white on `#6b8cff` is ~3:1) | WCAG AA text contrast (acceptance 5). |
+| 2026-10-01 | 4 | Breakpoints remapped: `md` = 760px, `lg` = 1000px. Top-bar search shows from 1000px (at 768 it squeezed out the page title). Upload rows use 3 columns only from 1280px. | Spec §3 breakpoints; no horizontal scroll at 375/768/1366. |
+| 2026-10-01 | 4 | Not built yet (Phase 5): Review queue / Reports / Admin nav items, charts, Export CSV, Download report, station filter on Inspections. Dashboard tile 4 is "Analyzing now" instead of model–reviewer agreement. Table thumbnails are a placeholder icon. | Out of scope or no backend yet. |
+| 2026-10-01 | 4 | Dashboard counts use `GET /videos?page_size=1` totals (one call per status) | No summary endpoint until `/reports/summary` (Phase 5). |
+| 2026-10-01 | 4 | Coincident evidence markers fan out 16px apart | Synthetic videos put every step's evidence at the same second. |
 
 ## Open questions for the user (from IMPLEMENTATION.md §11)
 
@@ -141,6 +165,12 @@ Phase 0 (all done):
 5. Integrations and webhooks? Keep the legacy `/analyze` endpoint? — _unanswered_
 
 ## Known issues / tech debt
+
+- Phase 4: dashboard "today" uses the browser's local date, but the API compares it to UTC `created_at`, so around midnight (IST 00:00–05:30) counts can be off. Fix in Phase 5 with a tz-aware `/reports/summary`.
+- Phase 4: signed media URLs expire after `VMS_MEDIA_URL_TTL_S`; a page left open longer needs a reload to keep streaming.
+- Phase 4: TS types are hand-maintained (`frontend/src/types/*.ts` mirror `schemas.py` and `result.py`). Consider openapi-typescript in Phase 7.
+- Phase 4: the `/_ui` gallery chunk is still emitted in production builds (the route itself is dev-only).
+- Phase 4: OpenCV writes `mp4v`, which browsers can't play. Test videos for the player need H.264 (`avc1`; works on Windows via MSMF).
 
 - Fixed in Phase 1: `process_type` now selects the rubric; YOLO is used; `estimated_sides` is scored (Return `six_sides`).
 - Heuristic weaknesses for Phase 6: (a) the label / tag / package contour heuristics fire on almost any textured frame (label_ratio ≈ 1.0 on synthetic video), so they barely discriminate. (b) Motion magnitude is the **mean over the whole frame**, so small moving objects stay below `ACTIVE_MAGNITUDE` (a 60 s synthetic box gives 0 direction changes), and the left-vs-right-half direction heuristic can flip as one object crosses the centre (a monotonic 3 s move gives 2 changes). (c) The `avg_text_blocks` thresholds (>5 / >3) came from v1 `readtext` counts and haven't been re-tuned on real footage for `detect()` at 480 px. (d) The COCO class map is a stopgap.
@@ -159,6 +189,13 @@ Phase 0 (all done):
 - Stale jobs are re-queued at the start of each worker loop iteration, so nothing reaps them while every worker is busy.
 
 ## Session log
+
+### 2026-10-01 — Phase 4 session
+- Baseline 244 passed. Branch `phase-4-frontend`. Backend now 252 passed; ruff clean.
+- Frontend: `npm run build`, `npm run lint` (0 warnings), `npm test` (18 passed), `tsc --noEmit` all clean.
+- **Live acceptance** (Built-in browser pane, API + worker + Vite running, `seed-demo`): logged in as `operator@vms.local`; uploaded 3 synthetic H.264 videos through the upload page (files injected into the file input, since the pane can't open the OS picker). They showed upload %, then "Analyzing N%", then badges (Review 74, Review 74, Fail 0). Opened one; the video streamed through the signed URL; clicking a timeline marker set `currentTime` to 11.33 (the evidence time). Operator: no Re-analyze (a reviewer sees it, per page test); other users' videos are blocked by the API (role matrix).
+- Responsive: `scrollWidth == innerWidth` at 375, 768 and 1366 on dashboard, upload, inspections, and detail (only the mobile nav row scrolls, by design). Compared with `docs/ui/mockup.html` in light and dark; deviations listed in Decisions.
+- Accessibility (`design:accessibility-review`): fixed light `--pass` and `--text-3` contrast (now ≥4.5:1 in both themes), added `prefers-reduced-motion`, skip link, labelled controls (a scan found no unlabelled controls), focus ring on every control, keyboard rows (Enter opens), player keys, and accessible names on timeline markers. Not fixed: touch targets <44px (2.5.5 is AAA, not AA).
 
 ### 2026-10-01 — Planning session
 - Analyzed the codebase (see IMPLEMENTATION.md §2). Recorded the test baseline.
@@ -189,6 +226,16 @@ Phase 0 (all done):
 - Acceptance: (1) the CLI writes a schema-valid result and 4 evidence JPEGs ✔. (2) `test_yaml_threshold_change_changes_score` ✔. (3) `test_shipped_caps_block_pass` plus the pipeline dark/blur tests ✔. (4) suite 8 s; 60 s video 45 s ✔. (5) `/analyze` is covered by `test_api.py` (v1 shape). `app.py` was verified headless with Streamlit AppTest and a stubbed upload in both modes (no exceptions; titles and CSV columns come from the rubric) ✔.
 
 ## Handoff notes for next session
+
+**Start Phase 5 (review workflow, reports, admin).** State after Phase 4:
+- Run: API (`uvicorn vms.api.main:app --reload --port 8000`), worker (`python -m vms.worker`), web (`cd frontend; npm run dev`, or `preview_start web` from `.claude/launch.json`). Demo logins are in the Phase 3 handoff below. `.env` needs `VMS_JWT_SECRET`.
+- Frontend map: `src/api/{client,endpoints,queries,queryClient}.ts`, `src/auth/{AuthProvider,RequireRole,roles,tokenStore}`, `src/components/ui/*` (Bar, Button/IconButton, Card/CardHeader/CardBody, DataTable, Dialog, EmptyState, ErrorState, FilterBar, Kbd, KpiTile, ScoreRing, Segmented, Skeleton, StatusBadge, Toast), `src/components/inspection/{VideoPlayer,EvidenceTimeline,StepCard,VerdictCard}`, `src/components/{AppShell,UploadQueue,VideoTable}`, `src/pages/*`, `src/upload/queue.ts`. Gallery at `/_ui` (dev).
+- Phase 5 to-dos in the UI: add nav items (Review queue with amber count, Reports, Admin) to `NAV` in `AppShell.tsx` with `REVIEWER_UP`/admin roles and wrap routes in `<RequireRole roles=...>`. Build `ReviewBar` (not built yet). Reuse `VideoPlayer` (`seek` handle, J/K) + `StepCard`/`VerdictCard` for the review page. `StatusBadge human` shows reviewer overrides (detail page passes `reviews.length > 0`). Swap the dashboard tile 4 to model–reviewer agreement, and add charts via the `dataviz` skill.
+- Types: edit `frontend/src/types/api.ts` when adding endpoints. Responses are zod-validated, so a shape mismatch surfaces as "unexpected response" plus a console error.
+- New routes must also go into `MATRIX` in `backend/tests/test_role_matrix.py`.
+- Tests: `src/test/render.tsx` `renderPage(el, {path, url})` + MSW `server.use(...)`; fixtures in `src/test/fixtures.ts`.
+
+### Phase 3 handoff (kept for reference)
 
 **Start Phase 4 (web frontend).** State after Phase 3:
 - Setup: `pip install -e "backend[dev]"` (adds pyjwt, argon2-cffi), then `alembic -c backend/alembic.ini upgrade head` (new migration `0002`). Put `VMS_JWT_SECRET=<32+ chars>` in `.env` so tokens survive reloads.

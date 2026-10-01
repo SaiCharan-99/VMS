@@ -13,8 +13,9 @@ Developer workflow, conventions and phase plan: see [CLAUDE.md](CLAUDE.md) and
 backend/vms/            Python package (config, analysis, db, services, storage, worker, API)
 backend/alembic/        DB migrations
 backend/tests/          pytest suite (synthetic videos via tests/fixtures/video_factory.py)
+frontend/               React + Vite + TS web app (VMS Inspect)
 ml/                     training utilities (frame extraction)
-app.py                  Streamlit demo UI (retired in Phase 7)
+app.py                  Streamlit demo UI: DEPRECATED, replaced by frontend/, deleted in Phase 7
 ```
 
 ## Quickstart (PowerShell)
@@ -26,9 +27,13 @@ pytest backend/tests -q                   # fast suite
 alembic -c backend/alembic.ini upgrade head     # creates data/vms.db
 uvicorn vms.api.main:app --reload --port 8000   # http://localhost:8000/docs
 python -m vms.worker                      # second terminal: runs queued analyses
+python -m vms.cli seed-demo               # dev only: demo warehouse + operator/reviewer/admin logins
+cd frontend; npm install; npm run dev     # third terminal: http://localhost:5173 (proxies /api to :8000)
 python -m vms.cli import-legacy --db audit_results.db   # once: old results -> new DB
-pip install streamlit pandas; streamlit run app.py
 ```
+
+The old Streamlit UI (`streamlit run app.py`) is deprecated; use the web app instead.
+Frontend checks: `npm run build`, `npm run lint`, `npm test`, `npm run typecheck` (in `frontend/`).
 
 Settings come from `VMS_*` environment variables or a `.env` file (see `backend/vms/config.py`),
 e.g. `VMS_OCR_ENABLED=false`, `VMS_PROCESS_FPS=3`, `VMS_DB_URL=sqlite:///data/vms.db`. See `.env.example`.

@@ -62,7 +62,9 @@ ruff check backend; ruff format backend
 alembic -c backend/alembic.ini upgrade head     # from Phase 2
 uvicorn vms.api.main:app --reload --port 8000    # API → http://localhost:8000/docs
 python -m vms.worker                             # job worker (from Phase 2)
+python -m vms.cli seed-demo                      # dev logins (see PROGRESS.md handoff)
 cd frontend; npm install; npm run dev            # UI → http://localhost:5173 (from Phase 4)
+cd frontend; npm run build; npm run lint; npm test; npm run typecheck   # frontend checks
 ```
 
 ## Session protocol (follow every session)
