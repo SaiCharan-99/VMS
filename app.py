@@ -2,7 +2,9 @@ import streamlit as st
 import tempfile, os
 import pandas as pd
 from datetime import datetime
-from vms.analysis.legacy_analyzer import VMSSOPAnalyzer
+from vms.analysis import analyze_video
+from vms.analysis.rubric import rubric_for
+from vms.config import get_settings
 
 st.set_page_config(page_title="VMS SOP Analyzer", page_icon="📦", layout="wide")
 
@@ -54,11 +56,9 @@ with st.sidebar:
     st.header("Configuration")
     process_type = st.selectbox("Process Mode", ["Return", "Forward"])
 
-    # Show what each mode checks
-    if process_type == "Forward":
-        st.info("**Forward (Packing)**\n\nChecks:\n- Shipping label & barcode\n- Packing process & sealing\n- Brand tag & hangtag\n- Product condition before packing")
-    else:
-        st.info("**Return (Unboxing)**\n\nChecks:\n- Shipping label & barcode\n- Package seal integrity & unboxing\n- Brand tag & hangtag\n- Product condition after opening")
+    rubric = rubric_for(process_type)
+    checks = "\n".join(f"- {step.title}" for step in rubric.steps)
+    st.info(f"**{rubric.title}**\n\nChecks:\n{checks}")
 
     uploaded_files = st.file_uploader(
         "Upload Inspection Videos",
@@ -67,35 +67,11 @@ with st.sidebar:
     )
     st.divider()
     blur_threshold = st.slider("Blur tolerance", 5.0, 100.0, 30.0, 5.0)
-    min_hold_sec   = st.slider("Min hold time (s)", 0.5, 5.0, 2.0, 0.5)
     st.divider()
     st.markdown("**💡 Slow upload?**")
     st.caption("• Phone: **Video Compress** app")
     st.caption("• PC: **HandBrake** — RF 28")
     st.caption("• Record at **720p** not 1080p")
-
-# ── SOP steps differ by process type ──────────────────────────────────────────
-STEPS_FORWARD = [
-    ("1. Shipping Label & Barcode",    "shipping_label", 30,
-     "Label clearly visible, barcode readable before sealing"),
-    ("2. Packing Process & Sealing",   "unboxing",       20,
-     "Item packed correctly, bag/box sealed fully on camera"),
-    ("3. Brand Tag & Hangtag",         "tags",           25,
-     "Brand tags attached and visible before packing"),
-    ("4. Product Condition",           "product",        25,
-     "Item unfolded and inspected for defects before packing"),
-]
-
-STEPS_RETURN = [
-    ("1. Shipping Label & Barcode",    "shipping_label", 30,
-     "Outer AWB label held clearly toward camera before opening"),
-    ("2. Package Seal & Unboxing",     "unboxing",       20,
-     "Seal inspected for tampering, package opened fully on camera, all 6 sides shown"),
-    ("3. Brand Tag & Hangtag",         "tags",           25,
-     "Brand labels and price tags shown close to camera"),
-    ("4. Product Condition",           "product",        25,
-     "Item fully unfolded, both sides shown, checked for damage or fraud"),
-]
 
 def score_color(pct):
     if pct >= 85: return "#22c55e"
@@ -107,41 +83,6 @@ def verdict_html(status):
     if status == "review": return '<span class="verdict-review">⚠️ REVIEW REQUIRED</span>'
     return '<span class="verdict-rejected">❌ REJECTED</span>'
 
-
-def manual_summary(result, process_type):
-    """Create a short reviewer-style summary for the downloadable report."""
-    step_names = {
-        "shipping_label": "shipping label and barcode",
-        "unboxing": "packing and sealing" if process_type == "Forward" else "package seal and unboxing",
-        "tags": "brand and hangtags",
-        "product": "product condition",
-    }
-    scores = result["scores"]
-    percentages = {
-        key: round(value["score"] / weight * 100)
-        for key, value, weight in [
-            ("shipping_label", scores["shipping_label"], 30),
-            ("unboxing", scores["unboxing"], 20),
-            ("tags", scores["tags"], 25),
-            ("product", scores["product"], 25),
-        ]
-    }
-    strongest = max(percentages, key=percentages.get)
-    weakest = min(percentages, key=percentages.get)
-    decision = result.get("decision", "Review Required").lower()
-    confidence = round(result.get("confidence", 0) * 100)
-
-    summary = (
-        f"{decision.capitalize()} after reviewing the {process_type.lower()} recording. "
-        f"The strongest area was the {step_names[strongest]} ({percentages[strongest]}%). "
-        f"The main area needing attention is the {step_names[weakest]} ({percentages[weakest]}%)."
-    )
-    if result.get("detected_barcode"):
-        summary += " The barcode was readable in the recording."
-    else:
-        summary += " The barcode was not confirmed clearly in the recording."
-    summary += f" Confidence in this review was {confidence}%."
-    return summary
 
 if not uploaded_files:
     st.info("Upload one or more inspection videos from the sidebar to begin.")
@@ -157,7 +98,8 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-STEPS = STEPS_FORWARD if process_type == "Forward" else STEPS_RETURN
+descriptions = {step.key: step.description for step in rubric.steps}
+settings = get_settings().model_copy(update={"blur_threshold": blur_threshold})
 all_rows = []
 
 for uploaded in uploaded_files:
@@ -176,11 +118,7 @@ for uploaded in uploaded_files:
     with analysis_col:
         with st.spinner(f"Analyzing {uploaded.name}..."):
             try:
-                result = VMSSOPAnalyzer(
-                    blur_threshold=blur_threshold,
-                    min_hold_sec=min_hold_sec,
-                    process_type=process_type,
-                ).analyze(tmp_path)
+                result = analyze_video(tmp_path, process_type, settings=settings)
             except Exception as e:
                 os.remove(tmp_path)
                 st.error(f"Could not analyze {uploaded.name}: {e}")
@@ -188,10 +126,10 @@ for uploaded in uploaded_files:
 
         os.remove(tmp_path)
 
-        score   = result["total_score"]
-        status  = result.get("status", "review")
+        score   = result.total_score
+        status  = result.status
         color   = score_color(score)
-        metrics = result.get("metrics", {})
+        metrics = result.metrics
 
         # ── Score + verdict ──
         st.markdown(
@@ -209,11 +147,13 @@ for uploaded in uploaded_files:
         )
 
         # ── Step cards ──
-        for label, key, weight, sop_desc in STEPS:
-            s      = result["scores"][key]
-            earned = s["score"]
-            notes  = s["notes"]
-            spct   = round(earned / weight * 100)
+        for i, step in enumerate(result.steps, start=1):
+            label    = f"{i}. {step.title}"
+            earned   = step.score
+            weight   = step.weight
+            notes    = step.notes
+            sop_desc = descriptions.get(step.key, "")
+            spct     = round(earned / weight * 100)
             sc     = score_color(spct)
 
             notes_html = "".join(
@@ -238,8 +178,8 @@ for uploaded in uploaded_files:
             """, unsafe_allow_html=True)
 
         # ── Stats ──
-        sampled  = result['frames_sampled']
-        failures = result['quality_failures']
+        sampled  = result.video.frames_sampled
+        failures = sampled - result.quality.frames_ok
         sides    = metrics.get('estimated_sides', '?')
 
         # For forward, show "sides sealed" context differently
@@ -247,7 +187,7 @@ for uploaded in uploaded_files:
 
         c1, c2, c3, c4 = st.columns(4)
         for col, val, lbl in [
-            (c1, f"{result['duration_s']}s",     "Duration"),
+            (c1, f"{result.video.duration_s:.1f}s", "Duration"),
             (c2, f"{sampled-failures}/{sampled}", "Frames OK"),
             (c3, f"{sides}/6",                   sides_label),
             (c4, process_type,                    "Mode"),
@@ -259,34 +199,29 @@ for uploaded in uploaded_files:
                 unsafe_allow_html=True,
             )
 
-        verdict = result.get("decision", "Review Required")
-        follow_up_notes = " ".join(
-            n.rstrip(".") for k in ["shipping_label", "unboxing", "tags", "product"]
-            for n in result["scores"][k]["notes"]
-        )
-        all_rows.append({
-            "Timestamp":         datetime.now().strftime("%Y-%m-%d %H:%M"),
-            "File":              uploaded.name,
-            "Process Type":      process_type,
-            "Verdict":           verdict,
-            "Manual Summary":     manual_summary(result, process_type),
-            "Score %":           f"{score}%",
-            "Label & Barcode %": f"{round(result['scores']['shipping_label']['score']/30*100)}%",
-            "Step 2 %":          f"{round(result['scores']['unboxing']['score']/20*100)}%",
-            "Brand Tag %":       f"{round(result['scores']['tags']['score']/25*100)}%",
-            "Product %":         f"{round(result['scores']['product']['score']/25*100)}%",
-            "Sides":             f"{sides}/6",
-            "Duration (s)":      result["duration_s"],
-            "Follow-up Notes":   follow_up_notes or "No follow-up points noted.",
+        follow_up_notes = " ".join(n.rstrip(".") for step in result.steps for n in step.notes)
+        row = {
+            "Timestamp":       datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "File":            uploaded.name,
+            "Process Type":    process_type,
+            "Verdict":         result.decision,
+            "Manual Summary":  result.summary,
+            "Score %":         f"{score}%",
+        }
+        for step in result.steps:
+            row[f"{step.title} %"] = f"{round(step.score / step.weight * 100)}%"
+        row.update({
+            "Barcodes":        ", ".join(b.value for b in result.barcodes) or "-",
+            "Sides":           f"{sides}/6",
+            "Duration (s)":    result.video.duration_s,
+            "Follow-up Notes": follow_up_notes or "No follow-up points noted.",
         })
+        all_rows.append(row)
 
 if all_rows:
     st.divider()
     st.subheader("Batch Summary")
     df = pd.DataFrame(all_rows)
-    # Rename Step 2 based on mode
-    step2_label = "Packing %" if process_type == "Forward" else "Unboxing %"
-    df = df.rename(columns={"Step 2 %": step2_label})
     st.dataframe(df, use_container_width=True, hide_index=True)
     st.download_button(
         "⬇️ Download CSV Report",
