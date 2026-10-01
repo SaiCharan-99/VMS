@@ -8,6 +8,7 @@ Read this first in **every** session. This project is built in phases, and each 
 | `PROGRESS.md` | Which phase is current, what's done, decisions, handoff notes | Always, second |
 | `IMPLEMENTATION.md` | Architecture, data model, API contract, analysis-result schema, rubric spec | The sections your phase links to |
 | `docs/phases/PHASE_N_*.md` | Task list, file plan, and acceptance criteria for one phase | Only the current phase |
+| `docs/UI_DESIGN.md` + `docs/ui/mockup.html` | UI design system and clickable visual target | Any frontend work (Phases 4–5) |
 | `PROMPTS.md` | Prompts the user pastes to start sessions | Not needed by Claude |
 
 ## What the product is
@@ -40,6 +41,7 @@ ml/ (frame extraction, YOLO training, evaluation harness)
 - **Config comes from env vars** through `vms.config.Settings` (pydantic-settings, `VMS_` prefix, `.env` supported). Do not hard-code paths, secrets, or thresholds.
 - **API:** every route is under `/api/v1`, errors return `{"detail": ...}`, list endpoints are paginated (`page`, `page_size` → `{items, total, page, page_size}`).
 - **Tests:** pytest under `backend/tests/`. Generate synthetic videos with `tests/fixtures/video_factory.py`. Never commit real videos (they're gitignored, and real sample videos go in `data/samples/`). Mark tests that need real models with `@pytest.mark.models`; they're skipped by default.
+- **UI:** follow `docs/UI_DESIGN.md`. Use only the design tokens and `src/components/ui` primitives. Green, amber, and red are reserved for pass, review, and fail.
 - **Lint and format:** `ruff check` and `ruff format`. Frontend: ESLint plus Prettier defaults, and strict TypeScript.
 - **Code style:** small modules, no dead code, and comments only where the *why* isn't obvious.
 - **Windows-first dev:** commands must work in PowerShell. Use `pathlib`, not string paths.

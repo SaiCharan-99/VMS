@@ -2,7 +2,7 @@
 
 **Goal:** Close the loop. Reviewers clear the `review` queue with reasons, managers see compliance analytics and export reports, and admins manage users, stations, and API keys from the UI.
 
-**Read:** IMPLEMENTATION.md §7 (reviews, reason codes, audit_log), §8 (review, report, and admin routes), §9.
+**Read:** `docs/UI_DESIGN.md` §4–6 + `docs/ui/mockup.html` (Review queue screen), IMPLEMENTATION.md §7 (reviews, reason codes, audit_log), §8 (review, report, and admin routes), §9.
 **Branch:** `phase-5-review-reports-admin`
 
 ## Tasks
@@ -30,6 +30,7 @@
 3. The CSV opens correctly in Excel (UTF-8 BOM) and includes the review columns.
 4. An admin can create an operator who can then log in and upload.
 5. All backend and frontend checks are green.
+6. The new screens use only the Phase 4 UI primitives and tokens (no raw hex, no one-off buttons), and they pass the same responsive and accessibility checks as Phase 4.
 
 ## Handoff notes
 

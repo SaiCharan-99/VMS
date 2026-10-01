@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VMS Inspect Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ===== Design tokens (mirror of docs/UI_DESIGN.md §2) ===== */
+:root{
+  --bg:#f7f8fa; --surface:#ffffff; --surface-2:#f1f3f6; --border:#e4e7ec; --border-strong:#d0d5dd;
+  --text:#101828; --text-2:#475467; --text-3:#98a2b3;
+  --accent:#2f5bea; --accent-soft:#eef2ff; --accent-text:#2443b8;
+  --pass:#12805c; --pass-soft:#e7f6ef; --review:#b54708; --review-soft:#fef4e6; --fail:#c0262d; --fail-soft:#fdeceb;
+  --shadow:0 1px 2px rgba(16,24,40,.05); --radius:10px; --radius-sm:6px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0c0e12; --surface:#14171c; --surface-2:#1b1f26; --border:#262b33; --border-strong:#333a44;
+  --text:#eef0f3; --text-2:#a3abb8; --text-3:#6b7380;
+  --accent:#6b8cff; --accent-soft:#1a2240; --accent-text:#a9bcff;
+  --pass:#3ccb8f; --pass-soft:#10291f; --review:#f2a443; --review-soft:#2e2112; --fail:#f2686e; --fail-soft:#2f1517;
+  --shadow:none;
+}}
+:root[data-theme="dark"]{
+  --bg:#0c0e12; --surface:#14171c; --surface-2:#1b1f26; --border:#262b33; --border-strong:#333a44;
+  --text:#eef0f3; --text-2:#a3abb8; --text-3:#6b7380;
+  --accent:#6b8cff; --accent-soft:#1a2240; --accent-text:#a9bcff;
+  --pass:#3ccb8f; --pass-soft:#10291f; --review:#f2a443; --review-soft:#2e2112; --fail:#f2686e; --fail-soft:#2f1517;
+  --shadow:none;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.mono{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12.5px}
+button{font:inherit;cursor:pointer}
+/* ===== Shell ===== */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+.side{background:var(--surface);border-right:1px solid var(--border);padding:18px 12px;display:flex;flex-direction:column;gap:2px;position:sticky;top:0;height:100vh}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 10px 18px;font-weight:600}
+.logo{width:28px;height:28px;border-radius:7px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:700}
+.nav{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text-2);border:0;background:none;text-align:left;width:100%}
+.nav:hover{background:var(--surface-2);color:var(--text)}
+.nav.on{background:var(--accent-soft);color:var(--accent-text);font-weight:500}
+.nav svg{width:17px;height:17px;flex:none}
+.nav .count{margin-left:auto;font-size:12px;background:var(--review-soft);color:var(--review);padding:0 7px;border-radius:99px;font-weight:600}
+.side .grow{flex:1}
+.me{display:flex;gap:10px;align-items:center;padding:10px;border-top:1px solid var(--border);margin-top:8px}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--surface-2);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--text-2)}
+.main{min-width:0}
+.top{height:60px;display:flex;align-items:center;gap:12px;padding:0 28px;border-bottom:1px solid var(--border);background:var(--surface)}
+.top h1{font-size:16px;font-weight:600;margin:0}
+.top .sp{flex:1}
+.search{display:flex;align-items:center;gap:8px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;color:var(--text-3);width:280px}
+.search input{border:0;background:none;outline:0;color:var(--text);font:inherit;width:100%}
+.content{padding:24px 28px 48px;max-width:1280px}
+/* ===== Primitives ===== */
+.btn{border:1px solid var(--border-strong);background:var(--surface);color:var(--text);padding:7px 14px;border-radius:var(--radius-sm);font-weight:500;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.pass{background:var(--pass);border-color:var(--pass);color:#fff}
+.btn.fail{background:var(--fail);border-color:var(--fail);color:#fff}
+.icon-btn{border:1px solid var(--border);background:var(--surface);color:var(--text-2);width:34px;height:34px;border-radius:var(--radius-sm);display:grid;place-items:center}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border)}
+.card-h h3{margin:0;font-size:14px;font-weight:600}
+.card-b{padding:16px 18px}
+.muted{color:var(--text-2)} .faint{color:var(--text-3)}
+.badge{display:inline-flex;align-items:center;gap:6px;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.b-pass{background:var(--pass-soft);color:var(--pass)} .b-review{background:var(--review-soft);color:var(--review)} .b-fail{background:var(--fail-soft);color:var(--fail)}
+.b-pending{background:var(--surface-2);color:var(--text-2)}
+.chip{display:inline-flex;font-size:12px;padding:1px 8px;border-radius:var(--radius-sm);background:var(--surface-2);color:var(--text-2);font-weight:500}
+.bar{height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.bar>i{display:block;height:100%;border-radius:99px}
+.grid{display:grid;gap:16px}
+.kpis{grid-template-columns:repeat(4,1fr)}
+.kpi .card-b{padding:16px 18px}
+.kpi .lbl{font-size:12.5px;color:var(--text-2)}
+.kpi .val{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:4px;font-variant-numeric:tabular-nums}
+.kpi .delta{font-size:12px;margin-top:2px}
+.up{color:var(--pass)} .down{color:var(--fail)}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;font-weight:500;color:var(--text-2);text-align:left;padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+td{padding:12px 18px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr:hover{background:var(--surface-2);cursor:pointer}
+tbody tr:last-child td{border-bottom:0}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:6px 12px;color:var(--text-2);border-right:1px solid var(--border)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--surface-2);color:var(--text);font-weight:500}
+.select{border:1px solid var(--border);background:var(--surface);color:var(--text);padding:6px 10px;border-radius:var(--radius-sm)}
+.page{display:none} .page.on{display:block}
+.row{display:flex;align-items:center;gap:10px}
+.thumb{width:44px;height:30px;border-radius:4px;background:linear-gradient(135deg,#c9b79c,#8d7a62);flex:none}
+/* ===== Chart ===== */
+.chart{display:flex;align-items:flex-end;gap:10px;height:170px;padding-top:8px}
+.chart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;height:100%}
+.chart .col i{display:block;border-radius:3px}
+.chart-x{display:flex;gap:10px;margin-top:8px}
+.chart-x span{flex:1;text-align:center;font-size:11.5px;color:var(--text-3)}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--text-2)}
+.legend span::before{content:"";display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;background:var(--c)}
+.hbar{display:grid;grid-template-columns:minmax(140px,1.4fr) minmax(60px,1fr) 32px;white-space:nowrap;gap:10px;align-items:center;padding:7px 0;font-size:13px}
+/* ===== Detail ===== */
+.detail{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;align-items:start}
+.player{aspect-ratio:16/9;border-radius:var(--radius);background:#1d1f24;position:relative;overflow:hidden;display:grid;place-items:center}
+.player .box{width:38%;height:46%;background:linear-gradient(160deg,#c8b394,#9b8466);border-radius:4px;transform:rotate(-6deg);box-shadow:0 20px 40px rgba(0,0,0,.4)}
+.player .label{position:absolute;left:47%;top:40%;width:13%;height:16%;background:#f4f4f1;border-radius:2px;transform:rotate(-6deg)}
+.player .hud{position:absolute;left:12px;bottom:12px;right:12px;display:flex;align-items:center;gap:10px;color:#fff;font-size:12px}
+.player .play{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.18);display:grid;place-items:center}
+.timeline{position:relative;height:38px;margin-top:12px}
+.timeline .track{position:absolute;left:0;right:0;top:17px;height:4px;border-radius:99px;background:var(--surface-2)}
+.timeline .prog{position:absolute;left:0;top:17px;height:4px;border-radius:99px;background:var(--accent);width:31%}
+.mark{position:absolute;top:8px;width:22px;height:22px;margin-left:-11px;border-radius:50%;border:2px solid var(--surface);display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff;cursor:pointer}
+.mark:hover{transform:scale(1.15)}
+.tl-x{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-3)}
+.verdict{display:flex;align-items:center;gap:18px}
+.ring{--p:88;width:76px;height:76px;border-radius:50%;background:conic-gradient(var(--pass) calc(var(--p)*1%),var(--surface-2) 0);display:grid;place-items:center;flex:none}
+.ring>div{width:62px;height:62px;border-radius:50%;background:var(--surface);display:grid;place-items:center;font-size:20px;font-weight:700;font-variant-numeric:tabular-nums}
+.meta{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border-top:1px solid var(--border)}
+.meta div{background:var(--surface);padding:12px 18px}
+.meta b{display:block;font-size:14px;font-weight:600;margin-top:2px}
+.step{border-top:1px solid var(--border);padding:14px 18px}
+.step:first-child{border-top:0}
+.step-h{display:flex;align-items:center;gap:10px}
+.step-h .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;flex:none}
+.step-h .t{font-weight:600;flex:1}
+.step-h .pts{font-variant-numeric:tabular-nums;color:var(--text-2);font-size:13px}
+.step .desc{font-size:12.5px;color:var(--text-3);margin:4px 0 10px 32px}
+.step .bar{margin-left:32px}
+.checks{margin:10px 0 0 32px;display:grid;gap:6px}
+.check{display:flex;gap:8px;font-size:13px;align-items:baseline}
+.check .ok{color:var(--pass)} .check .no{color:var(--review)}
+.evid{display:flex;gap:8px;margin:10px 0 0 32px}
+.evid div{width:64px;height:40px;border-radius:4px;background:linear-gradient(135deg,#c9b79c,#7c6a54);position:relative;cursor:pointer}
+.evid div span{position:absolute;right:3px;bottom:2px;font-size:10px;color:#fff;background:rgba(0,0,0,.55);padding:0 4px;border-radius:3px}
+.c-pass{background:var(--pass)} .c-review{background:var(--review)} .c-fail{background:var(--fail)}
+/* ===== Review ===== */
+.review-bar{position:sticky;bottom:0;margin-top:16px;display:flex;gap:10px;align-items:center;padding:14px 18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 -4px 16px rgba(16,24,40,.06)}
+kbd{font:500 11px "JetBrains Mono",monospace;padding:1px 5px;border-radius:4px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--text-2)}
+.queue{display:grid;grid-template-columns:300px 1fr;gap:20px}
+.qitem{padding:12px 16px;border-bottom:1px solid var(--border);cursor:pointer}
+.qitem.on{background:var(--accent-soft);box-shadow:inset 3px 0 0 var(--accent)}
+/* ===== Upload ===== */
+.drop{border:1.5px dashed var(--border-strong);border-radius:var(--radius);padding:44px;text-align:center;background:var(--surface)}
+.drop .ic{width:44px;height:44px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin:0 auto 12px}
+.field{display:grid;gap:6px}
+.field label{font-size:12.5px;font-weight:500;color:var(--text-2)}
+.input{border:1px solid var(--border-strong);background:var(--surface);color:var(--text);padding:8px 10px;border-radius:var(--radius-sm);font:inherit}
+.up-item{display:grid;grid-template-columns:1fr 160px 120px;gap:16px;align-items:center;padding:12px 18px;border-top:1px solid var(--border)}
+.spin{width:12px;height:12px;border:2px solid var(--accent-soft);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite;display:inline-block}
+@keyframes s{to{transform:rotate(360deg)}}
+/* ===== Responsive ===== */
+.split{grid-template-columns:1.6fr 1fr}.split-up{grid-template-columns:1fr 300px}
+@media (max-width:1000px){.detail,.queue,.split,.split-up{grid-template-columns:1fr}.kpis{grid-template-columns:repeat(2,1fr)}}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}.side{position:static;height:auto;flex-direction:row;overflow-x:auto;padding:8px}
+  .brand,.me,.side .grow{display:none}.nav{width:auto;white-space:nowrap}
+  .top{padding:0 16px}.search{display:none}.content{padding:16px}
+  .hide-sm{display:none}.up-item{grid-template-columns:1fr}
+  .meta{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="logo">V</div>VMS Inspect</div>
+    <button class="nav on" data-p="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>Dashboard</button>
+    <button class="nav" data-p="upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Upload</button>
+    <button class="nav" data-p="videos"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-2v8l-4-2"/></svg>Inspections</button>
+    <button class="nav" data-p="review"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 11l2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>Review queue<span class="count">14</span></button>
+    <button class="nav" data-p="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>Reports</button>
+    <button class="nav" data-p="dash"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.8 1.2V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-2.8-1.2l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1A1.7 1.7 0 0 0 3.1 14H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.2-2.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1A1.7 1.7 0 0 0 10 3.1V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 2.8 1.2l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1A1.7 1.7 0 0 0 20.9 10H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Admin</button>
+    <div class="grow"></div>
+    <div class="me"><div class="avatar">PR</div><div><div style="font-weight:500;font-size:13px">Priya R.</div><div class="faint" style="font-size:12px">Reviewer · BLR-01</div></div></div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <h1 id="title">Dashboard</h1>
+      <div class="sp"></div>
+      <div class="search"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input placeholder="Search AWB, barcode, file…"></div>
+      <button class="icon-btn" id="theme" title="Toggle theme"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <button class="btn primary" data-p="upload">+ Upload videos</button>
+    </header>
+
+    <div class="content">
+      <!-- ================= DASHBOARD ================= -->
+      <section class="page on" id="p-dash">
+        <div class="grid kpis">
+          <div class="card kpi"><div class="card-b"><div class="lbl">Inspected today</div><div class="val">412</div><div class="delta up">▲ 8% vs last Tue</div></div></div>
+          <div class="card kpi"><div class="card-b"><div class="lbl">Pass rate</div><div class="val">86.4%</div><div class="delta up">▲ 2.1 pts</div></div></div>
+          <div class="card kpi"><div class="card-b"><div class="lbl">Awaiting review</div><div class="val">14</div><div class="delta faint">oldest 38 min</div></div></div>
+          <div class="card kpi"><div class="card-b"><div class="lbl">Model–reviewer agreement</div><div class="val">91%</div><div class="delta down">▼ 1.4 pts</div></div></div>
+        </div>
+        <div class="grid split" style="margin-top:16px">
+          <div class="card">
+            <div class="card-h"><h3>Outcomes, last 7 days</h3><div class="legend"><span style="--c:var(--pass)">Pass</span><span style="--c:var(--review)">Review</span><span style="--c:var(--fail)">Fail</span></div></div>
+            <div class="card-b"><div class="chart" id="chart"></div><div class="chart-x" id="chartx"></div></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><h3>Most-missed SOP checks</h3><span class="faint" style="font-size:12px">7 days</span></div>
+            <div class="card-b" id="missed"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-h"><h3>Recent inspections</h3><button class="btn" data-p="videos">View all</button></div>
+          <table><thead><tr><th>Video</th><th class="hide-sm">AWB</th><th class="hide-sm">Type</th><th class="num">Score</th><th>Status</th></tr></thead><tbody id="recent"></tbody></table>
+        </div>
+      </section>
+
+      <!-- ================= INSPECTIONS ================= -->
+      <section class="page" id="p-videos">
+        <div class="filters">
+          <div class="seg"><button class="on">All</button><button>Pass</button><button>Review</button><button>Fail</button><button>Pending</button></div>
+          <select class="select"><option>All types</option><option>Forward</option><option>Return</option></select>
+          <select class="select"><option>All stations</option><option>BLR-01 / S1</option></select>
+          <select class="select"><option>Last 7 days</option><option>Today</option><option>Last 30 days</option></select>
+          <span class="sp" style="flex:1"></span><button class="btn">Export CSV</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>Video</th><th class="hide-sm">AWB</th><th class="hide-sm">Type</th><th class="hide-sm">Operator</th><th class="hide-sm">Uploaded</th><th class="num">Score</th><th>Status</th></tr></thead><tbody id="all"></tbody></table>
+          <div class="card-h" style="border-top:1px solid var(--border);border-bottom:0"><span class="muted" style="font-size:13px">Showing 1–8 of 2,914</span><div class="row"><button class="btn">Previous</button><button class="btn">Next</button></div></div>
+        </div>
+      </section>
+
+      <!-- ================= DETAIL ================= -->
+      <section class="page" id="p-detail">
+        <div class="row" style="margin-bottom:16px"><button class="btn" data-p="videos">← Inspections</button><span class="mono muted">ret_blr01_0931.mp4</span><span class="chip">Return</span><span class="sp" style="flex:1"></span><button class="btn">Re-analyze</button><button class="btn">Download report</button></div>
+        <div class="detail">
+          <div>
+            <div class="player"><div class="box"></div><div class="label"></div>
+              <div class="hud"><div class="play">▶</div><span class="mono">0:13 / 0:42</span></div></div>
+            <div class="timeline"><div class="track"></div><div class="prog"></div><div id="marks"></div></div>
+            <div class="tl-x"><span>0:00</span><span>Click a marker to jump to the evidence</span><span>0:42</span></div>
+          </div>
+          <div class="grid">
+            <div class="card">
+              <div class="card-b verdict">
+                <div class="ring" style="--p:88"><div>88</div></div>
+                <div style="flex:1"><span class="badge b-pass">Accepted</span>
+                  <div style="margin-top:6px;font-size:13px" class="muted">Return recording passed. Weakest area: brand tags (72%). Barcode read at 0:03.</div></div>
+              </div>
+              <div class="meta"><div><span class="faint">Confidence</span><b>81%</b></div><div><span class="faint">AWB</span><b class="mono">AWB123456789</b></div><div><span class="faint">Frames OK</span><b>119 / 127</b></div></div>
+            </div>
+            <div class="card" id="steps"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= REVIEW ================= -->
+      <section class="page" id="p-review">
+        <div class="queue">
+          <div class="card" style="overflow:hidden">
+            <div class="card-h"><h3>Queue · 14</h3><select class="select" style="padding:3px 6px"><option>Oldest first</option></select></div>
+            <div id="queue"></div>
+          </div>
+          <div>
+            <div class="detail" style="grid-template-columns:1fr">
+              <div class="player" style="aspect-ratio:21/9"><div class="box"></div><div class="label"></div><div class="hud"><div class="play">▶</div><span class="mono">0:07 / 0:31</span></div></div>
+              <div class="card">
+                <div class="card-b verdict"><div class="ring" style="--p:64;background:conic-gradient(var(--review) 64%,var(--surface-2) 0)"><div>64</div></div>
+                <div style="flex:1"><span class="badge b-review">Review required</span><div class="muted" style="margin-top:6px;font-size:13px">Only ~3 of 6 sides shown before opening. Barcode read at 0:02.</div></div></div>
+              </div>
+            </div>
+            <div class="review-bar">
+              <select class="select"><option>Reason…</option><option>Seal not shown</option><option>Model was wrong (operator compliant)</option><option>Video quality</option><option>Other</option></select>
+              <input class="input" placeholder="Comment (optional)" style="flex:1;min-width:120px">
+              <button class="btn fail">Fail <kbd style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">F</kbd></button>
+              <button class="btn pass">Pass <kbd style="background:transparent;color:#fff;border-color:rgba(255,255,255,.5)">P</kbd></button>
+            </div>
+            <div class="faint" style="font-size:12px;margin-top:8px">Shortcuts: <kbd>P</kbd> pass · <kbd>F</kbd> fail · <kbd>N</kbd> next · <kbd>J</kbd>/<kbd>K</kbd> seek ±5s</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= UPLOAD ================= -->
+      <section class="page" id="p-upload">
+        <div class="grid split-up" style="align-items:start">
+          <div class="grid">
+            <div class="drop"><div class="ic"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg></div>
+              <div style="font-weight:600">Drop inspection videos here</div><div class="muted" style="font-size:13px;margin:4px 0 14px">MP4, MOV, AVI or MKV · up to 500 MB each</div><button class="btn">Browse files</button></div>
+            <div class="card">
+              <div class="card-h"><h3>This batch</h3><span class="faint" style="font-size:12px">3 files</span></div>
+              <div class="up-item" style="border-top:0"><div><div style="font-weight:500">fwd_blr01_1102.mp4</div><div class="faint" style="font-size:12px">48.2 MB · Forward</div></div><div class="bar"><i style="width:100%;background:var(--pass)"></i></div><div><span class="badge b-pass">Pass · 92</span></div></div>
+              <div class="up-item"><div><div style="font-weight:500">fwd_blr01_1103.mp4</div><div class="faint" style="font-size:12px">51.0 MB · Forward</div></div><div class="bar"><i style="width:58%;background:var(--accent)"></i></div><div class="muted" style="font-size:13px"><span class="spin"></span>&nbsp; Analyzing 58%</div></div>
+              <div class="up-item"><div><div style="font-weight:500">fwd_blr01_1104.mp4</div><div class="faint" style="font-size:12px">39.7 MB · Forward</div></div><div class="bar"><i style="width:24%;background:var(--text-3)"></i></div><div class="muted" style="font-size:13px">Uploading 24%</div></div>
+            </div>
+          </div>
+          <div class="card"><div class="card-b grid" style="gap:14px">
+            <div class="field"><label>Process type</label><div class="seg"><button class="on" style="flex:1">Forward</button><button style="flex:1">Return</button></div></div>
+            <div class="field"><label>Station</label><select class="select"><option>BLR-01 / Station 1</option></select></div>
+            <div class="field"><label>AWB (optional)</label><input class="input mono" placeholder="Auto-detected from barcode"></div>
+            <div style="font-size:12.5px;background:var(--surface-2);border-radius:var(--radius-sm);padding:10px 12px" class="muted"><b style="color:var(--text)">Tips for a passing video</b><br>Record at 720p. Hold the label still for 2 seconds. Show all 6 sides before you open the parcel.</div>
+          </div></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+const S={pass:["b-pass","Pass"],review:["b-review","Review"],fail:["b-fail","Fail"],pending:["b-pending","Analyzing"]};
+const rows=[
+ ["ret_blr01_0931.mp4","AWB123456789","Return","Ravi K.","10:42",88,"pass"],
+ ["fwd_blr01_0930.mp4","AWB123455102","Forward","Anita S.","10:39",64,"review"],
+ ["fwd_blr01_0929.mp4","AWB123455099","Forward","Ravi K.","10:35",95,"pass"],
+ ["ret_blr01_0928.mp4","—","Return","Mohit P.","10:31",31,"fail"],
+ ["fwd_blr01_0927.mp4","AWB123455071","Forward","Anita S.","10:30",null,"pending"],
+ ["ret_blr01_0926.mp4","AWB123454880","Return","Mohit P.","10:24",91,"pass"],
+ ["fwd_blr01_0925.mp4","AWB123454861","Forward","Ravi K.","10:20",72,"review"],
+ ["fwd_blr01_0924.mp4","AWB123454850","Forward","Anita S.","10:18",89,"pass"]];
+const tr=(r,full)=>`<tr data-p="detail"><td><div class="row"><div class="thumb"></div><span style="font-weight:500">${r[0]}</span></div></td><td class="mono muted hide-sm">${r[1]}</td><td class="hide-sm"><span class="chip">${r[2]}</span></td>${full?`<td class="hide-sm muted">${r[3]}</td><td class="hide-sm muted">Today ${r[4]}</td>`:""}<td class="num" style="font-weight:600">${r[5]??"—"}</td><td><span class="badge ${S[r[6]][0]}">${S[r[6]][1]}</span></td></tr>`;
+recent.innerHTML=rows.slice(0,5).map(r=>tr(r,false)).join("");
+all.innerHTML=rows.map(r=>tr(r,true)).join("");
+const days=[["Thu",310,40,18],["Fri",352,38,22],["Sat",280,30,15],["Sun",190,22,9],["Mon",366,45,24],["Tue",384,41,19],["Wed",356,40,16]];
+chart.innerHTML=days.map(d=>`<div class="col" title="${d[0]}: ${d[1]} pass, ${d[2]} review, ${d[3]} fail"><i style="height:${d[3]/4.6}%;background:var(--fail)"></i><i style="height:${d[2]/4.6}%;background:var(--review)"></i><i style="height:${d[1]/4.6}%;background:var(--pass)"></i></div>`).join("");
+chartx.innerHTML=days.map(d=>`<span>${d[0]}</span>`).join("");
+missed.innerHTML=[["All 6 sides shown",142],["Barcode readable",97],["Brand tag close-up",71],["Product both sides",44],["Seal visible",29]].map(m=>`<div class="hbar"><span>${m[0]}</span><div class="bar"><i style="width:${m[1]/1.42}%;background:var(--accent)"></i></div><span class="num muted">${m[1]}</span></div>`).join("");
+const steps=[
+ ["Shipping label & barcode","Outer AWB label held toward camera before opening",30,30,"pass",[[1,"Label text readable"],[1,"Barcode read · AWB123456789 at 0:03"]],["0:03","0:05"]],
+ ["Package seal & unboxing","Seal inspected, all 6 sides shown, opened on camera",20,17,"pass",[[1,"Package visible 72% of video"],[0,"~5 of 6 sides shown"],[1,"Duration 42s"]],["0:09","0:15"]],
+ ["Brand tag & hangtag","Brand labels and price tags shown close to camera",25,18,"review",[[1,"Tag detected"],[0,"Tag text partly unreadable, hold it closer"]],["0:24"]],
+ ["Product condition","Item unfolded, both sides shown, checked for damage",25,23,"pass",[[1,"Product visible 44% of video"],[1,"Both sides shown"]],["0:31","0:36"]]];
+steps.forEach((s,i)=>{const p=Math.round(s[3]/s[2]*100);
+ document.getElementById("steps").insertAdjacentHTML("beforeend",`<div class="step"><div class="step-h"><span class="n c-${s[4]}" style="color:#fff">${i+1}</span><span class="t">${s[0]}</span><span class="pts">${s[3]}/${s[2]}</span></div><div class="desc">${s[1]}</div><div class="bar"><i class="c-${s[4]}" style="width:${p}%"></i></div><div class="checks">${s[5].map(c=>`<div class="check"><span class="${c[0]?"ok":"no"}">${c[0]?"✓":"!"}</span><span class="${c[0]?"muted":""}">${c[1]}</span></div>`).join("")}</div><div class="evid">${s[6].map(t=>`<div title="Jump to ${t}"><span>${t}</span></div>`).join("")}</div></div>`);
+ s[6].forEach(t=>{const [m,sec]=t.split(":").map(Number);marks.insertAdjacentHTML("beforeend",`<div class="mark c-${s[4]}" style="left:${(m*60+sec)/42*100}%" title="Step ${i+1} evidence at ${t}">${i+1}</div>`)});});
+queue.innerHTML=rows.filter(r=>r[6]==="review").concat([["ret_blr02_0811.mp4","AWB123441002","Return","",,58,"review"],["fwd_blr02_0807.mp4","AWB123440950","Forward","",,69,"review"]]).map((r,i)=>`<div class="qitem ${i?"":"on"}"><div class="row"><span style="font-weight:500;flex:1">${r[0]}</span><span class="badge b-review">${r[5]}</span></div><div class="faint mono" style="font-size:12px;margin-top:2px">${r[1]} · ${r[2]} · ${12+i*9} min ago</div></div>`).join("");
+const titles={dash:"Dashboard",upload:"Upload",videos:"Inspections",review:"Review queue",detail:"Inspection"};
+document.addEventListener("click",e=>{const t=e.target.closest("[data-p]");if(!t)return;const p=t.dataset.p;
+ document.querySelectorAll(".page").forEach(x=>x.classList.toggle("on",x.id==="p-"+p));
+ document.querySelectorAll(".nav").forEach(n=>n.classList.toggle("on",n===t||(n.dataset.p===p&&!t.classList.contains("nav")&&n.textContent.trim().startsWith(titles[p].split(" ")[0]))));
+ title.textContent=titles[p];scrollTo(0,0);});
+theme.onclick=()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark";};
+</script>
+</body>
+</html>

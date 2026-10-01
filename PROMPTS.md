@@ -79,9 +79,11 @@ Update PROGRESS.md with demo credentials and handoff notes.
 
 ```
 Read CLAUDE.md and PROGRESS.md, then do Phase 4 per docs/phases/PHASE_4_frontend.md.
-Scaffold frontend/ (React + Vite + TS + Tailwind + TanStack Query) and build login,
-upload with live job progress, the videos list with filters, and the video detail page with
-player, evidence timeline, and step cards, keeping the dark visual style of app.py.
+Read docs/UI_DESIGN.md and open docs/ui/mockup.html first: that is the visual target.
+Scaffold frontend/ (React + Vite + TS + Tailwind + TanStack Query), build the design tokens
+and UI primitives first, then login, upload with live job progress, the inspections list
+with filters, and the inspection detail page with player, evidence timeline, and step cards.
+Compare against the mockup in light and dark at 375/768/1366 px.
 Make build, lint, typecheck, and tests clean, run the app, and confirm the full flow in the
 browser. Then update PROGRESS.md.
 ```
