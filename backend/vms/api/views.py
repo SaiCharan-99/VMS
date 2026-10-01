@@ -7,13 +7,16 @@ from sqlalchemy.orm import Session
 
 from vms.api.schemas import AnalysisBrief, AnalysisOut, EvidenceOut, VideoOut
 from vms.db.models import Analysis, Video
+from vms.security import sign_media_url
 
 API_PREFIX = "/api/v1"
 
 
 def video_out(video: Video, latest: Analysis | None = None) -> VideoOut:
     out = VideoOut.model_validate(video)
-    out.stream_url = f"{API_PREFIX}/videos/{video.id}/stream" if video.storage_key else None
+    out.stream_url = (
+        sign_media_url(f"{API_PREFIX}/videos/{video.id}/stream") if video.storage_key else None
+    )
     out.latest_analysis = AnalysisBrief.model_validate(latest) if latest else None
     return out
 
@@ -42,7 +45,7 @@ def analysis_out(analysis: Analysis) -> AnalysisOut:
                 step_key=e.step_key,
                 kind=e.kind,
                 t_s=e.t_s,
-                url=f"{API_PREFIX}/evidence/{e.id}",
+                url=sign_media_url(f"{API_PREFIX}/evidence/{e.id}"),
             )
             for e in analysis.evidence
         ],

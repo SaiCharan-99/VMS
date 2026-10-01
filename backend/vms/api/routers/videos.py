@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from vms.api.deps import PageParams, admin_only, any_role, get_db, reviewer_up
+from vms.api.deps import PageParams, admin_only, any_role, get_db, media_access, reviewer_up
 from vms.api.schemas import JobOut, Page, ReviewOut, UploadOut, VideoDetail, VideoOut
 from vms.api.views import analysis_out, video_out, video_outs
 from vms.config import get_settings
@@ -18,11 +18,12 @@ from vms.storage import Storage, get_storage
 router = APIRouter(prefix="/videos", tags=["videos"])
 
 
-def _get_video(db: Session, video_id: int, principal: Principal) -> Video:
+def _get_video(db: Session, video_id: int, principal: Principal | None) -> Video:
+    """`principal=None` means access was already granted by a signed media URL."""
     video = db.get(Video, video_id)
     if video is None or video.deleted_at is not None:
         raise HTTPException(status_code=404, detail="Video not found.")
-    if not principal.can_see(video):
+    if principal is not None and not principal.can_see(video):
         raise HTTPException(status_code=403, detail="Not your video.")
     return video
 
@@ -130,7 +131,7 @@ def stream_video(
     video_id: int,
     db: Session = Depends(get_db),
     storage: Storage = Depends(get_storage),
-    principal: Principal = Depends(any_role),
+    principal: Principal | None = Depends(media_access),
 ) -> FileResponse:
     """The video file. Supports HTTP Range for seeking in a `<video>` player."""
     video = _get_video(db, video_id, principal)

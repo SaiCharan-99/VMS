@@ -1,12 +1,12 @@
 from collections.abc import Callable, Iterator
 
-from fastapi import Depends, HTTPException, Query, Security
+from fastapi import Depends, HTTPException, Query, Request, Security
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from vms.db import get_sessionmaker
 from vms.db.models import Role, User
-from vms.security import decode_access_token
+from vms.security import decode_access_token, verify_media_signature
 from vms.services import api_keys
 from vms.services.principal import Principal
 
@@ -68,6 +68,21 @@ def require_api_key(principal: Principal = Depends(get_current_principal)) -> Pr
     if principal.api_key is None:
         raise HTTPException(status_code=403, detail="This endpoint needs an API key.")
     return principal
+
+
+def media_access(
+    request: Request,
+    exp: int | None = Query(None, description="Signed-URL expiry (unix s)"),
+    sig: str | None = Query(None, description="Signed-URL signature"),
+    db: Session = Depends(get_db),
+    creds: HTTPAuthorizationCredentials | None = Security(_bearer),
+    api_key: str | None = Security(_api_key),
+) -> Principal | None:
+    """None when the URL carries a valid signature (it was issued to someone allowed to see it);
+    otherwise the caller must authenticate normally."""
+    if sig and verify_media_signature(request.url.path, exp, sig):
+        return None
+    return get_current_principal(db, creds, api_key)
 
 
 any_role = require_role(*ANY_ROLE)

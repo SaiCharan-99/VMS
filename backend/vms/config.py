@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     jwt_ttl_hours: int = 12
     login_max_failures: int = 10
     login_window_s: int = 900
+    # Lifetime of signed stream/evidence URLs handed out in API responses.
+    media_url_ttl_s: int = 6 * 3600
 
 
 @lru_cache

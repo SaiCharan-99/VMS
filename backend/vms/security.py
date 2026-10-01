@@ -1,8 +1,10 @@
 """Password hashing (argon2), JWT access tokens, and API-key hashing."""
 
 import hashlib
+import hmac
 import logging
 import secrets
+import time
 from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 
@@ -76,3 +78,21 @@ def new_api_key() -> str:
 def hash_api_key(key: str) -> str:
     # Keys are long and random, so a fast hash is enough (and allows lookup by hash).
     return hashlib.sha256(key.encode()).hexdigest()
+
+
+def _media_sig(path: str, exp: int) -> str:
+    msg = f"{path}\n{exp}".encode()
+    return hmac.new(jwt_secret().encode(), msg, hashlib.sha256).hexdigest()
+
+
+def sign_media_url(path: str, *, ttl_s: int | None = None) -> str:
+    """`path?exp=…&sig=…`: lets `<video>`/`<img>` tags (which can't send headers) load media."""
+    ttl_s = ttl_s if ttl_s is not None else get_settings().media_url_ttl_s
+    exp = int(time.time()) + ttl_s
+    return f"{path}?exp={exp}&sig={_media_sig(path, exp)}"
+
+
+def verify_media_signature(path: str, exp: int | None, sig: str | None) -> bool:
+    if exp is None or not sig or exp < time.time():
+        return False
+    return hmac.compare_digest(_media_sig(path, exp), sig)
