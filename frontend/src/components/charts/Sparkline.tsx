@@ -20,6 +20,8 @@ function Tip({ active, payload }: TooltipProps<number, string>) {
 /** Tiny single-series trend in the accent colour (no axes; the tile names the measure). */
 export function Sparkline({ points, label }: { points: SparkPoint[]; label: string }) {
   const t = useTokens();
+  // A single day with data has no line to draw, so mark it with a dot instead.
+  const lonely = points.filter((p) => p.value !== null).length < 2;
   return (
     <div className="mt-2 h-9" role="img" aria-label={label}>
       <ResponsiveContainer width="100%" height="100%">
@@ -31,7 +33,7 @@ export function Sparkline({ points, label }: { points: SparkPoint[]; label: stri
             dataKey="value"
             stroke={t.accent}
             strokeWidth={2}
-            dot={false}
+            dot={lonely ? { r: 3, fill: t.accent, stroke: t.surface, strokeWidth: 2 } : false}
             activeDot={{ r: 4, stroke: t.surface, strokeWidth: 2 }}
             connectNulls
             isAnimationActive={false}
