@@ -1,24 +1,16 @@
-import pytest
-from fastapi.testclient import TestClient
+"""Legacy v1 compatibility routes (`/health`, `/analyze`, `/results`)."""
+
+import json
 
 from tests.fixtures.video_factory import make_video
-from vms.api.main import app, get_store
-from vms.legacy_store import AuditStore
-
-
-@pytest.fixture
-def client(tmp_path):
-    store = AuditStore(tmp_path / "api.db")
-    app.dependency_overrides[get_store] = lambda: store
-    with TestClient(app) as c:
-        yield c
-    app.dependency_overrides.clear()
 
 
 def test_health(client):
-    resp = client.get("/health")
-    assert resp.status_code == 200
-    assert resp.json()["status"] == "ok"
+    for path in ("/health", "/api/v1/health"):
+        body = client.get(path).json()
+        assert body["status"] == "ok"
+        assert body["db"] == "ok"
+        assert body["detectors"]["ocr"] is False  # disabled in tests
 
 
 def test_analyze_happy_path_and_results(client, tmp_path):
@@ -37,6 +29,14 @@ def test_analyze_happy_path_and_results(client, tmp_path):
 
     rows = client.get("/results").json()["results"]
     assert rows[0]["id"] == result["record_id"]
+    assert rows[0]["file_name"] == "v.mp4"
+    assert json.loads(rows[0]["result_json"])["detected_barcode"] == "AWB-1"
+
+    # The sync analysis is stored in the new tables too.
+    page = client.get("/api/v1/videos").json()
+    assert page["total"] == 1
+    assert page["items"][0]["source"] == "api"
+    assert page["items"][0]["awb"] == "AWB-1"
 
 
 def test_corrupt_file_returns_400(client):

@@ -8,8 +8,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="VMS_", env_file=".env", extra="ignore")
 
     data_dir: Path = Path("data")
-    # Legacy results store; kept at the repo root until Phase 2 imports it.
-    db_url: str = "sqlite:///audit_results.db"
+    db_url: str = "sqlite:///data/vms.db"
     yolo_weights: Path = Path("yolov8n.pt")
     ocr_enabled: bool = True
     yolo_enabled: bool = True
@@ -34,13 +33,11 @@ class Settings(BaseSettings):
     # COCO has no apparel classes, so the contour heuristic still counts as "product".
     heuristic_product_fallback: bool = True
     max_upload_mb: int = 500
-
-    @property
-    def sqlite_path(self) -> Path:
-        prefix = "sqlite:///"
-        if not self.db_url.startswith(prefix):
-            raise ValueError(f"Legacy store needs a sqlite:/// URL, got {self.db_url!r}")
-        return Path(self.db_url[len(prefix) :])
+    cors_origins: list[str] = ["http://localhost:5173"]
+    worker_poll_s: float = 1.5
+    # A running job whose heartbeat is older than this is assumed lost and re-queued.
+    job_stale_s: int = 300
+    job_max_attempts: int = 3
 
 
 @lru_cache
