@@ -54,8 +54,13 @@ services:
       VMS_DB_URL: postgresql+psycopg://${POSTGRES_USER:-vms}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vms}
       VMS_DATA_DIR: /data
       VMS_WORKER_METRICS_PORT: "9100"
+      VMS_WORKER_HEARTBEAT_FILE: /tmp/worker.alive
     healthcheck:
-      disable: true
+      test: ["CMD", "python", "-c", "import os,sys,time; sys.exit(time.time() - os.path.getmtime('/tmp/worker.alive') > 60)"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
     # The worker releases its job back to the queue on SIGTERM; give it time to notice.
     stop_grace_period: 30s
     depends_on:

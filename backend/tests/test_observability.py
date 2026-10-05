@@ -126,3 +126,21 @@ def test_cors_only_answers_configured_origins(app):
         )
     assert allowed.headers["access-control-allow-origin"] == "http://localhost:5173"
     assert "access-control-allow-origin" not in denied.headers
+
+
+def test_worker_heartbeat_file(db_ready, tmp_path, monkeypatch):
+    import threading
+    import time
+
+    beat = tmp_path / "worker.alive"
+    monkeypatch.setenv("VMS_WORKER_HEARTBEAT_FILE", str(beat))
+    get_settings.cache_clear()
+    worker = Worker()
+    thread = threading.Thread(target=worker.run, args=(0.1,), daemon=True)
+    thread.start()
+    deadline = time.monotonic() + 5
+    while not beat.exists() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    worker.request_stop()
+    thread.join(5)
+    assert beat.exists()

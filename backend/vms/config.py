@@ -52,6 +52,8 @@ class Settings(BaseSettings):
     log_format: str = "text"
     # Workers serve their own Prometheus metrics (analysis durations) on this port when set.
     worker_metrics_port: int | None = None
+    # Touched every 10 s while the worker is alive and can reach the DB (container healthcheck).
+    worker_heartbeat_file: Path | None = None
     worker_poll_s: float = 1.5
     # A running job whose heartbeat is older than this is assumed lost and re-queued.
     job_stale_s: int = 300

@@ -9,10 +9,13 @@ import logging
 import os
 import signal
 import socket
+import threading
 import time
 import uuid
 from collections.abc import Callable
 from types import FrameType
+
+from sqlalchemy import text
 
 from vms.analysis import analyze_video
 from vms.config import Settings, get_settings
@@ -26,6 +29,7 @@ from vms.storage import Storage, get_storage
 log = logging.getLogger(__name__)
 
 HEARTBEAT_EVERY_S = 1.0
+HEARTBEAT_FILE_EVERY_S = 10.0
 
 
 class _Interrupted(Exception):
@@ -133,8 +137,23 @@ class Worker:
             clear_log_context()
         return True
 
+    def _touch_heartbeat(self) -> None:
+        """Container liveness: the file's mtime is refreshed while the process (and its
+        DB connection) is healthy, including during a long analysis."""
+        path = self.settings.worker_heartbeat_file
+        while not self.stopping and path is not None:
+            try:
+                with session_scope() as s:
+                    s.execute(text("SELECT 1"))
+                path.touch()
+            except Exception as exc:  # noqa: BLE001 - a stale file is the signal
+                log.warning("Heartbeat check failed: %s", exc)
+            time.sleep(HEARTBEAT_FILE_EVERY_S)
+
     def run(self, poll_s: float) -> None:
         log.info("Worker %s started (poll %.1fs)", self.worker_id, poll_s)
+        if self.settings.worker_heartbeat_file is not None:
+            threading.Thread(target=self._touch_heartbeat, daemon=True).start()
         while not self.stopping:
             if not self.run_once():
                 deadline = time.monotonic() + poll_s
