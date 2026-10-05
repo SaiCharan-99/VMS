@@ -30,10 +30,8 @@ ANY_OWNER = {**ANY, "api_key": F}
 USER_ONLY = {**ANY, "api_key": F}
 REVIEWER = {"anon": U, "operator": F, "reviewer": OK, "admin": OK, "api_key": F}
 ADMIN = {"anon": U, "operator": F, "reviewer": F, "admin": OK, "api_key": F}
-API_KEY = {"anon": U, "operator": F, "reviewer": F, "admin": F, "api_key": OK}
 
 MATRIX: dict[tuple[str, str], dict[str, object]] = {
-    ("GET", "/health"): PUBLIC,
     ("GET", "/api/v1/health"): PUBLIC,
     ("POST", "/api/v1/auth/login"): PUBLIC,
     ("GET", "/api/v1/auth/me"): USER_ONLY,
@@ -63,8 +61,6 @@ MATRIX: dict[tuple[str, str], dict[str, object]] = {
     ("POST", "/api/v1/admin/api-keys"): ADMIN,
     ("DELETE", "/api/v1/admin/api-keys/{key_id}"): ADMIN,
     ("GET", "/api/v1/admin/audit-log"): ADMIN,
-    ("POST", "/analyze"): API_KEY,
-    ("GET", "/results"): API_KEY,
 }
 
 BODIES = {
@@ -80,12 +76,11 @@ BODIES = {
 
 
 def test_matrix_covers_every_route(app):
-    # FastAPI >= 0.14x keeps included routers nested, so read the routes from OpenAPI; the
-    # legacy root `/health` is hidden from the schema.
+    # FastAPI >= 0.14x keeps included routers nested, so read the routes from OpenAPI.
     routes = {
         (method.upper(), path) for path, ops in app.openapi()["paths"].items() for method in ops
     }
-    assert routes | {("GET", "/health")} == set(MATRIX)
+    assert routes == set(MATRIX)
 
 
 @pytest.fixture

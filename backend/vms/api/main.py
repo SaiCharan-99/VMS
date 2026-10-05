@@ -11,7 +11,6 @@ from vms.api.routers import (
     evidence,
     health,
     jobs,
-    legacy,
     reports,
     review_queue,
     rubrics,
@@ -51,8 +50,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         admin,
     ):
         app.include_router(module.router, prefix=API_PREFIX)
-    app.include_router(health.router, include_in_schema=False)  # legacy `/health`
-    app.include_router(legacy.router)
     return app
 
 

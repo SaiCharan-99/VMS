@@ -64,12 +64,6 @@ def require_user(principal: Principal = Depends(get_current_principal)) -> User:
     return principal.user
 
 
-def require_api_key(principal: Principal = Depends(get_current_principal)) -> Principal:
-    if principal.api_key is None:
-        raise HTTPException(status_code=403, detail="This endpoint needs an API key.")
-    return principal
-
-
 def media_access(
     request: Request,
     exp: int | None = Query(None, description="Signed-URL expiry (unix s)"),

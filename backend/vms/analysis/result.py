@@ -11,8 +11,6 @@ StepStatus = Literal["met", "partial", "missed"]
 MetricValue = float | int | bool
 
 DECISIONS: dict[str, str] = {"pass": "Accepted", "review": "Review Required", "fail": "Rejected"}
-# v1 consumers (`/analyze`, app.py batch CSV) address steps by these fixed keys, in rubric order.
-V1_STEP_KEYS = ("shipping_label", "unboxing", "tags", "product")
 
 
 class EngineInfo(BaseModel):
@@ -90,34 +88,3 @@ class AnalysisResult(BaseModel):
     caps_applied: list[str]
     summary: str
     timings_ms: dict[str, int]
-
-    def to_v1(self) -> dict:
-        """Legacy v1 dict used by `/analyze` and older clients."""
-        m = self.metrics
-
-        def pct(key: str) -> float:
-            return round(float(m.get(key, 0.0)) * 100, 1)
-
-        return {
-            "total_score": self.total_score,
-            "status": self.status,
-            "decision": self.decision,
-            "confidence": round(self.confidence, 2),
-            "duration_s": round(self.video.duration_s, 1),
-            "detected_barcode": self.barcodes[0].value if self.barcodes else None,
-            "frames_sampled": self.video.frames_sampled,
-            "quality_failures": self.video.frames_sampled - self.quality.frames_ok,
-            "scores": {
-                v1_key: {"score": step.score, "notes": list(step.notes)}
-                for v1_key, step in zip(V1_STEP_KEYS, self.steps, strict=True)
-            },
-            "metrics": {
-                "pct_label": pct("label_ratio"),
-                "pct_tag": pct("tag_ratio"),
-                "pct_obj": pct("product_ratio"),
-                "pct_package": pct("package_ratio"),
-                "avg_text": round(float(m.get("avg_text_blocks", 0.0)), 1),
-                "direction_changes": int(m.get("direction_changes", 0)),
-                "estimated_sides": int(m.get("estimated_sides", 0)),
-            },
-        }

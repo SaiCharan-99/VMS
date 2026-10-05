@@ -203,8 +203,6 @@ def test_openapi_lists_phase2_endpoints(client):
         "/api/v1/jobs/{job_id}",
         "/api/v1/evidence/{evidence_id}",
         "/api/v1/rubrics",
-        "/analyze",
-        "/results",
     ):
         assert p in paths, p
 

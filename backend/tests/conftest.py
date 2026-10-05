@@ -105,11 +105,3 @@ def client(app: FastAPI, make_user: Callable[..., User]) -> Iterator[TestClient]
     """Logged in as an admin (sees and may do everything)."""
     with TestClient(app, headers=auth(make_user(Role.admin, "admin@test.local"))) as c:
         yield c
-
-
-@pytest.fixture
-def api_client(app: FastAPI, make_api_key) -> Iterator[TestClient]:
-    """Authenticated with an API key (acts as an operator; legacy routes allowed)."""
-    _, headers = make_api_key()
-    with TestClient(app, headers=headers) as c:
-        yield c
