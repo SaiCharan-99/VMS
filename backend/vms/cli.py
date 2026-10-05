@@ -2,7 +2,7 @@
 
 python -m vms.cli analyze <video> --process-type Return [--json out.json]
 python -m vms.cli import-legacy --db audit_results.db
-python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts for the password
+python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts (or --password-stdin)
 python -m vms.cli seed-demo                                         # dev only
 python -m vms.cli sop-doc --out docs/SOP.md                         # operator guide from rubrics
 python -m vms.cli export-eval --out data/eval/labels.csv            # human reviews -> eval labels
@@ -53,10 +53,13 @@ def _create_admin(args: argparse.Namespace) -> int:
     from vms.db.models import Role
     from vms.services import users
 
-    password = getpass.getpass("Password: ")
-    if password != getpass.getpass("Repeat password: "):
-        print("Passwords do not match.", file=sys.stderr)
-        return 1
+    if args.password_stdin:
+        password = sys.stdin.readline().rstrip("\r\n")
+    else:
+        password = getpass.getpass("Password: ")
+        if password != getpass.getpass("Repeat password: "):
+            print("Passwords do not match.", file=sys.stderr)
+            return 1
     try:
         with session_scope() as session:
             user = users.create(
@@ -154,6 +157,9 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("create-admin", help="Create an admin user (prompts for the password)")
     p.add_argument("--email", required=True)
     p.add_argument("--name", required=True)
+    p.add_argument(
+        "--password-stdin", action="store_true", help="read the password from stdin (scripts)"
+    )
     p.set_defaults(func=_create_admin)
 
     p = sub.add_parser("seed-demo", help="Dev only: demo warehouse, stations, one user per role")

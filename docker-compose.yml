@@ -4,10 +4,6 @@
 
 x-backend: &backend
   image: ${VMS_IMAGE:-vms-backend}:${VMS_TAG:-latest}
-  build:
-    context: ./backend
-    args:
-      WITH_ML: ${WITH_ML:-1}
   env_file: .env
   environment:
     VMS_DB_URL: postgresql+psycopg://${POSTGRES_USER:-vms}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-vms}
@@ -42,6 +38,11 @@ services:
 
   api:
     <<: *backend
+    # Built once here; migrate and worker run the same image.
+    build:
+      context: ./backend
+      args:
+        WITH_ML: ${WITH_ML:-1}
     depends_on:
       migrate:
         condition: service_completed_successfully

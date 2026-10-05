@@ -346,3 +346,12 @@ def test_seed_demo_refuses_outside_dev(db_ready, monkeypatch):
     monkeypatch.setenv("VMS_ENV", "prod")
     get_settings.cache_clear()
     assert cli_main(["seed-demo"]) == 1
+
+
+def test_create_admin_cli_password_stdin(anon_client, monkeypatch):
+    import io
+
+    monkeypatch.setattr("sys.stdin", io.StringIO(TEST_PASSWORD + "\n"))
+    args = ["create-admin", "--email", "ci@test.local", "--name", "CI", "--password-stdin"]
+    assert cli_main(args) == 0
+    assert _login(anon_client, "ci@test.local", TEST_PASSWORD).status_code == 200
