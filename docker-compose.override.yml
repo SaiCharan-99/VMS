@@ -3,7 +3,7 @@
 services:
   postgres:
     ports:
-      - "5432:5432"   # psql / pytest against the stack's database
+      - "${VMS_PG_PORT:-5432}:5432"   # psql / pytest against the stack's database
   api:
     environment:
       VMS_ENV: dev
@@ -13,7 +13,7 @@ services:
       - vms-data:/data
       - ./backend/vms:/app/vms:ro
     ports:
-      - "8000:8000"   # API + /docs + /metrics directly
+      - "${VMS_API_PORT:-8000}:8000"   # API + /docs + /metrics directly
   worker:
     environment:
       VMS_ENV: dev
