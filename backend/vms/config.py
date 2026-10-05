@@ -58,6 +58,8 @@ class Settings(BaseSettings):
     login_window_s: int = 900
     # Lifetime of signed stream/evidence URLs handed out in API responses.
     media_url_ttl_s: int = 6 * 3600
+    # `vms.cli purge` deletes video files older than this (rows and evidence stay). None = keep.
+    retention_days: int | None = None
 
 
 @lru_cache

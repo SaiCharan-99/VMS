@@ -152,6 +152,10 @@ class Video(Base):
         _enum(FinalStatus), default=FinalStatus.pending
     )
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # A disputed video is evidence in an open claim: retention never purges its file.
+    disputed_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Set when retention deleted the video file; the rows, analysis and evidence stay.
+    file_purged_at: Mapped[datetime | None] = mapped_column(DateTime)
 
     jobs: Mapped[list["Job"]] = relationship(back_populates="video", order_by="Job.id")
     analyses: Mapped[list["Analysis"]] = relationship(

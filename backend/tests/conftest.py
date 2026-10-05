@@ -1,3 +1,4 @@
+import os
 from collections.abc import Callable, Iterator
 from pathlib import Path
 
@@ -5,6 +6,7 @@ import pytest
 from argon2 import PasswordHasher
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from sqlalchemy import MetaData, create_engine
 
 from vms import security
 from vms.analysis.detectors import get_ocr_reader, get_yolo
@@ -15,6 +17,23 @@ from vms.services import api_keys, users
 from vms.services.principal import Principal
 
 TEST_PASSWORD = "correct-horse-1"
+# CI's Postgres leg sets this; each test then starts from an empty schema in that database.
+PG_TEST_URL = os.environ.get("VMS_TEST_DB_URL")
+
+
+def db_url_for(tmp_path: Path, name: str = "vms.db") -> str:
+    return PG_TEST_URL or f"sqlite:///{(tmp_path / name).as_posix()}"
+
+
+def reset_db(url: str) -> None:
+    """Drop every table (and the alembic stamp) so a shared Postgres DB starts empty."""
+    engine = create_engine(url)
+    try:
+        meta = MetaData()
+        meta.reflect(engine)
+        meta.drop_all(engine)
+    finally:
+        engine.dispose()
 
 
 def _clear_caches() -> None:
@@ -36,7 +55,7 @@ def isolated_settings(
     # A developer's `.env` must not leak into tests (e.g. VMS_JWT_SECRET defeats the prod check).
     monkeypatch.setitem(Settings.model_config, "env_file", None)
     monkeypatch.setenv("VMS_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("VMS_DB_URL", f"sqlite:///{(tmp_path / 'vms.db').as_posix()}")
+    monkeypatch.setenv("VMS_DB_URL", db_url_for(tmp_path))
     monkeypatch.setenv("VMS_ENV", "dev")
     monkeypatch.setenv("VMS_JWT_SECRET", "test-secret-" + "x" * 32)
     # Cheap argon2 parameters keep the role matrix fast; production uses the library defaults.
@@ -51,7 +70,9 @@ def isolated_settings(
 
 @pytest.fixture
 def db_ready() -> None:
-    """Tables + seeded system user in the per-test SQLite DB."""
+    """Tables + seeded system user in the per-test DB."""
+    if PG_TEST_URL:
+        reset_db(PG_TEST_URL)
     create_all()
 
 

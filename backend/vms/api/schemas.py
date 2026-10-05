@@ -184,6 +184,13 @@ class VideoOut(_Orm):
     latest_analysis: AnalysisBrief | None = None
     # True when a human review set `final_status` (the list "human override" badge).
     human_reviewed: bool = False
+    disputed: bool = False
+    # Retention deleted the video file; the analysis and evidence frames are still here.
+    file_purged: bool = False
+
+
+class DisputeIn(BaseModel):
+    disputed: bool
 
 
 class ReviewIn(BaseModel):

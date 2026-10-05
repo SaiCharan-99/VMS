@@ -6,7 +6,16 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from vms.api.deps import PageParams, admin_only, any_role, get_db, media_access, reviewer_up
-from vms.api.schemas import JobOut, Page, ReviewIn, ReviewOut, UploadOut, VideoDetail, VideoOut
+from vms.api.schemas import (
+    DisputeIn,
+    JobOut,
+    Page,
+    ReviewIn,
+    ReviewOut,
+    UploadOut,
+    VideoDetail,
+    VideoOut,
+)
 from vms.api.views import analysis_out, review_outs, video_outs
 from vms.config import get_settings
 from vms.db.models import FinalStatus, ProcessType, Station, Video, VideoSource
@@ -134,6 +143,8 @@ def stream_video(
 ) -> FileResponse:
     """The video file. Supports HTTP Range for seeking in a `<video>` player."""
     video = _get_video(db, video_id, principal)
+    if video.file_purged_at is not None:
+        raise HTTPException(status_code=410, detail="Video file deleted by the retention policy.")
     if not video.storage_key or not storage.exists(video.storage_key):
         raise HTTPException(status_code=404, detail="Video file not available.")
     return FileResponse(
@@ -154,9 +165,25 @@ def reanalyze_video(
     video = _get_video(db, video_id, principal)
     if not video.storage_key:
         raise HTTPException(status_code=409, detail="Legacy import has no video file.")
+    if video.file_purged_at is not None:
+        raise HTTPException(status_code=409, detail="Video file deleted by the retention policy.")
     job = video_svc.reanalyze(db, video, principal, get_settings().job_max_attempts)
     db.commit()
     return JobOut.model_validate(job)
+
+
+@router.put("/{video_id}/dispute", response_model=VideoOut)
+def set_dispute(
+    video_id: int,
+    body: DisputeIn,
+    db: Session = Depends(get_db),
+    principal: Principal = Depends(reviewer_up),
+) -> VideoOut:
+    """Flag the video as evidence in an open dispute (retention keeps its file), or clear it."""
+    video = _get_video(db, video_id, principal)
+    video_svc.set_disputed(db, video, body.disputed, principal)
+    db.commit()
+    return video_outs(db, [video])[0]
 
 
 @router.delete("/{video_id}", status_code=204)

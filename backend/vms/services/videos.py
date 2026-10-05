@@ -192,6 +192,14 @@ def soft_delete(session: Session, video: Video, actor: Principal) -> None:
     audit.log(session, "video.deleted", "video", video.id, **actor.actor)
 
 
+def set_disputed(session: Session, video: Video, disputed: bool, actor: Principal) -> None:
+    if disputed == (video.disputed_at is not None):
+        return
+    video.disputed_at = utcnow() if disputed else None
+    action = "video.dispute_opened" if disputed else "video.dispute_closed"
+    audit.log(session, action, "video", video.id, **actor.actor)
+
+
 def reanalyze(session: Session, video: Video, actor: Principal, max_attempts: int = 3) -> Job:
     job = jobs.enqueue(session, video, max_attempts)
     audit.log(session, "video.reanalyze", "video", video.id, {"job_id": job.id}, **actor.actor)

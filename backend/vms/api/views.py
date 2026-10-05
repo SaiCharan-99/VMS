@@ -21,9 +21,10 @@ def video_out(
     out = VideoOut.model_validate(video)
     out.uploaded_by_name = uploader
     out.human_reviewed = reviewed
-    out.stream_url = (
-        sign_media_url(f"{API_PREFIX}/videos/{video.id}/stream") if video.storage_key else None
-    )
+    out.disputed = video.disputed_at is not None
+    out.file_purged = video.file_purged_at is not None
+    has_file = video.storage_key and video.file_purged_at is None
+    out.stream_url = sign_media_url(f"{API_PREFIX}/videos/{video.id}/stream") if has_file else None
     out.latest_analysis = AnalysisBrief.model_validate(latest) if latest else None
     return out
 

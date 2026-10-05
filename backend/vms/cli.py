@@ -6,6 +6,7 @@ python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts fo
 python -m vms.cli seed-demo                                         # dev only
 python -m vms.cli sop-doc --out docs/SOP.md                         # operator guide from rubrics
 python -m vms.cli export-eval --out data/eval/labels.csv            # human reviews -> eval labels
+python -m vms.cli purge --older-than-days 180 [--dry-run]           # retention file purge
 """
 
 import argparse
@@ -106,6 +107,23 @@ def _export_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _purge(args: argparse.Namespace) -> int:
+    from vms.db import session_scope
+    from vms.services.retention import purge
+    from vms.storage import get_storage
+
+    days = args.older_than_days or get_settings().retention_days
+    if not days or days < 1:
+        print("Pass --older-than-days N (N >= 1) or set VMS_RETENTION_DAYS.", file=sys.stderr)
+        return 1
+    with session_scope() as session:
+        report = purge(session, get_storage(), days, dry_run=args.dry_run)
+    verb = "Would delete" if args.dry_run else "Deleted"
+    mb = report.bytes_freed / 1024 / 1024
+    print(f"{verb} {report.purged} video files older than {days} days ({mb:.1f} MB).")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vms.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -136,6 +154,11 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("export-eval", help="Write human-reviewed videos as an eval labels CSV")
     p.add_argument("--out", type=Path, default=Path("data/eval/labels.csv"))
     p.set_defaults(func=_export_eval)
+
+    p = sub.add_parser("purge", help="Retention: delete old video files (rows/evidence kept)")
+    p.add_argument("--older-than-days", type=int, help="default: VMS_RETENTION_DAYS")
+    p.add_argument("--dry-run", action="store_true", help="only count what would be deleted")
+    p.set_defaults(func=_purge)
 
     args = parser.parse_args(argv)
     configure_logging()
