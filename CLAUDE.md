@@ -51,6 +51,9 @@ ml/ (frame extraction, YOLO training, evaluation harness)
 These are valid from Phase 0 onward. If a command doesn't work yet, check PROGRESS.md for the current state.
 
 ```powershell
+# everything in Docker, one command (README "Quick setup")
+powershell -ExecutionPolicy Bypass -File scripts\setup.ps1   # or: bash scripts/setup.sh
+docker compose -f docker-compose.yml up -d --build --wait  # production mode (docs/DEPLOY.md)
 # backend setup
 py -m venv .venv; .\.venv\Scripts\Activate.ps1
 pip install -e "backend[dev]"            # add ,ml for easyocr+ultralytics
@@ -62,7 +65,10 @@ ruff check backend; ruff format backend
 alembic -c backend/alembic.ini upgrade head     # from Phase 2
 uvicorn vms.api.main:app --reload --port 8000    # API → http://localhost:8000/docs
 python -m vms.worker                             # job worker (from Phase 2)
-python -m vms.cli seed-demo                      # dev logins (see PROGRESS.md handoff)
+python -m vms.cli seed-demo                      # dev logins (see README)
+python -m vms.cli purge --older-than-days 180 --dry-run   # retention (files only; rows/evidence kept)
+python -m vms.cli openapi; cd frontend; npm run gen:api   # after API schema changes (tests/CI check it)
+$env:VMS_TEST_DB_URL="postgresql+psycopg://user@host:5432/db"; pytest backend/tests -q   # Postgres leg
 python -m vms.cli sop-doc --out docs/SOP.md      # regenerate the operator guide after rubric changes (from Phase 5)
 python ml/evaluate.py --labels data/eval/labels.csv --rubric return-v1   # accuracy vs human labels (false-pass rate); --from-cache re-scores without CV
 python -m vms.cli export-eval --out data/eval/labels.csv                 # human reviews -> eval labels
@@ -70,6 +76,7 @@ python ml/calibrate.py --labels data/eval/labels.csv --rubric return-v2  # sugge
 python ml/extract_frames.py; python ml/train.py                          # frames -> annotate (ml/dataset/README.md) -> YOLO training
 cd frontend; npm install; npm run dev            # UI → http://localhost:5173 (from Phase 4)
 cd frontend; npm run build; npm run lint; npm test; npm run typecheck   # frontend checks
+cd frontend; $env:E2E_EMAIL=…; $env:E2E_PASSWORD=…; $env:E2E_VIDEO=…; npm run e2e   # Playwright smoke vs running stack
 ```
 
 ## Session protocol (follow every session)

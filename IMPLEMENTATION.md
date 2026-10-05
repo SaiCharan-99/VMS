@@ -205,7 +205,7 @@ Metric keys (the canonical list is `vms.analysis.metrics.METRIC_KEYS`; rubrics m
 
 Evidence `image` paths are relative to `VMS_DATA_DIR` when the evidence dir is inside it, otherwise relative to the evidence dir itself. `image` is `null` when no evidence dir was given. Steps list their evidence signal kinds in the rubric (`evidence: [barcode, label]`); one entry per step that had a firing signal.
 
-The legacy v1 shape (`scores.{shipping_label,unboxing,tags,product}.{score,notes}`) can be derived from v2. `routers/legacy.py` does this so old `/analyze` clients keep working.
+The legacy v1 shape (`scores.{shipping_label,unboxing,tags,product}.{score,notes}`) can be derived from v2. (Removed in Phase 7 with the legacy endpoints.)
 
 ---
 
@@ -303,7 +303,7 @@ Review reason codes: `label_unclear`, `seal_not_shown`, `tags_not_shown`, `produ
 | `GET /admin/audit-log` | admin | filters `action` (prefix), `entity_type, entity_id, actor_user_id, actor_api_key_id, date_from, date_to`; paginated, newest first |
 | `GET /rubrics` | any | active rubrics (for UI step labels and descriptions) |
 | `GET /stations` | any | all stations, for the upload form (Phase 4) |
-| `POST /analyze`, `GET /results` (root, legacy) | api key only | Scoped to the key's own uploads. Phase 2 compatibility shim. Synchronous, returns the v1 shape. Deprecated in Phase 7. |
+| `PUT /videos/{id}/dispute` | reviewer+ | `{disputed: bool}` → `VideoOut`. Disputed videos are never purged by retention. Audit `video.dispute_opened/closed`. (Legacy `POST /analyze` and `GET /results` were removed in Phase 7.) |
 
 Auth header: `Authorization: Bearer <jwt>` or `X-API-Key: <key>`. Phase 3: `deps.get_current_principal` resolves either; an API key acts as an `operator` (uploads get `source=api`, `api_key_id`) and sees only its own uploads. Operators see only their own uploads (403 on others' videos, streams, jobs, evidence). Login is rate limited: 10 failures per email+IP per 15 min → 429. Every route except `/health` and `/auth/login` returns 401 without credentials.
 

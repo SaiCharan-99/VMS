@@ -2,7 +2,7 @@
 
 > **Every session:** read this after CLAUDE.md. **Before ending a session:** update the status table, tick tasks, add a session log entry, record decisions and known issues, and write handoff notes. The next session has no other memory.
 
-## Current phase: **Phase 7 — Production hardening & deploy** (Phase 6 tooling done; the real-data numbers are blocked on videos, see Known issues)
+## Current phase: **v1.0 released** (all phases done; Phase 6 real-data numbers still blocked on videos, see Known issues)
 
 ## Phase status
 
@@ -16,7 +16,7 @@
 | 4 | Web frontend (core) | [PHASE_4](docs/phases/PHASE_4_frontend.md) | ✅ done | `phase-4-frontend` | 2026-10-01 |
 | 5 | Review workflow, reports, admin | [PHASE_5](docs/phases/PHASE_5_review_reports_admin.md) | ⚠️ done (PDF report skipped) | `phase-5-review-reports-admin` | 2026-10-01 |
 | 6 | ML training & evaluation | [PHASE_6](docs/phases/PHASE_6_ml_training_eval.md) | ⚠️ tooling done; no real data (see Known issues) | `phase-6-ml` | 2026-10-01 |
-| 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ⏳ next | `phase-7-production` | |
+| 7 | Production hardening & deploy | [PHASE_7](docs/phases/PHASE_7_production.md) | ✅ done (**v1.0**) | `phase-7-production` | 2026-10-05 |
 
 Legend: ⬜ not started · ⏳ next / in progress · ✅ done · ⚠️ done with caveats (see Known issues)
 
@@ -31,6 +31,21 @@ Dependencies: 0 → 1 → 2 → 3 → 4 → 5. Phase 6 needs 1 and 2 (it's bette
 ## Current-phase task checklist
 
 Copy the task list from the current phase doc here at session start, and tick items as you go.
+
+Phase 7 (done, v1.0):
+- [x] Docker: `backend/Dockerfile` (python 3.12-slim, libzbar0/libgl, `WITH_ML` build arg, CPU torch, EasyOCR + yolov8n weights baked in, non-root uid 10001, healthcheck), `frontend/Dockerfile` (node build -> nginx 1.27), `docker-compose.yml` (postgres, one-shot `migrate`, api, scalable `worker`, web), `docker-compose.override.yml` (dev: VMS_ENV=dev, text logs, reload, API/PG ports)
+- [x] Postgres: whole suite runs on Postgres via `VMS_TEST_DB_URL` (conftest drops/creates the schema per test); migration test also asserts `compare_metadata` is empty; job claims use `FOR UPDATE SKIP LOCKED` on Postgres, SQLite path unchanged
+- [x] Config & secrets: complete `.env.example`; startup fails outside dev on a missing/short/placeholder (`change-me`) JWT secret and on `*` in `VMS_CORS_ORIGINS`; CORS methods/headers are explicit lists
+- [x] Observability: JSON logs (`VMS_LOG_FORMAT=json`) with request_id (X-Request-ID in/out, set by nginx), user_id/api_key_id, job_id/video_id/worker_id; `/api/v1/health` checks DB + writable data dir + detectors (503 when degraded); `/metrics` (API: request latency per route template, jobs by status from the DB), worker metrics on `VMS_WORKER_METRICS_PORT` (analysis duration histogram); worker heartbeat file for the container healthcheck
+- [x] Retention: `python -m vms.cli purge [--older-than-days N] [--dry-run]` (default `VMS_RETENTION_DAYS`); deletes only the file, sets `videos.file_purged_at`, audit `video.file_purged`; skips pending/review, disputed and busy videos. New `PUT /videos/{id}/dispute` (reviewer+), migration `0003`. Stream → 410 and reanalyze → 409 after purge; UI shows a purged message and a Mark disputed / Clear dispute button
+- [ ] Webhooks: **skipped** (user, 2026-10-05: no consumer yet; backlog)
+- [x] Security pass (`security-review` skill): no findings at the >= 8/10 bar; fixed an open redirect in `safeNext` (`/\evil` bypass) found during the audit; nginx CSP + headers in every location; pip-audit clean; npm audit: 2 moderate react-router advisories with no 6.x fix (mitigated, see Decisions); dev-only highs in tooling
+- [x] Type sync: `python -m vms.cli openapi` -> `frontend/openapi.json` (a backend test fails when stale) -> `npm run gen:api` -> `src/types/openapi.ts` (CI fails when stale); `src/types/contract.ts` makes `tsc` fail when the zod schemas drift from it
+- [x] CI: `.github/workflows/ci.yml` (backend SQLite + Postgres matrix, lint, frontend gen-check/typecheck/lint/test/build, pip-audit + npm audit, compose build + Playwright E2E with 2 workers in production mode); `nightly.yml` (models tests + ML image build)
+- [x] E2E: `frontend/e2e/smoke.spec.ts` (login -> upload synthetic video -> verdict -> detail)
+- [x] Legacy removal: `app.py`, `requirements.txt`, `packages.txt`, root `package.json`, `/analyze`, `/results`, `legacy_analyzer.py`, `to_v1()`, the root `/health` (user, 2026-10-05: remove)
+- [x] Docs: `docs/DEPLOY.md`, `docs/API.md`, README rewritten (one-command setup + AI-agent steps), `AGENTS.md`, `scripts/setup.{ps1,sh}`
+- [x] Also: lazy-loaded Dashboard/Review/Reports/Admin (main bundle ~820 -> 383 kB), `/_ui` gallery no longer emitted in production, `create-admin --password-stdin`
 
 Phase 6 (tooling done and tested on synthetic data; training and real-data numbers are blocked on videos):
 - [x] Eval harness first: `backend/vms/evaluation/{labels,runner,scoring,report,calibrate,export,cli}.py`; `ml/evaluate.py --labels … --rubric … [--weights] [--from-cache]` writes `data/eval/report_<ts>.{json,md}`: confusion matrix, per-step accuracy, **false-pass rate**, review rate, runtime. Per-video metrics are cached in `data/eval/cache/`, so re-scoring with another rubric skips the CV run
@@ -207,6 +222,15 @@ Phase 0 (all done):
 | 2026-10-01 | 6 | Calibration objective: (false passes, review + false fails) in lexicographic order; only decision cutoffs and numeric check thresholds are tuned. Warns below 30 labelled videos | A plain "fewest reviews" objective would pick all-fail. A human copies the diff into a new rubric id. |
 | 2026-10-01 | 6 | `export-eval` is a CLI (`python -m vms.cli export-eval`), not `GET /reports/export.csv?format=eval` | The phase doc allowed either; the file needs server-side video paths, which shouldn't go over HTTP. Reviews only carry pass/fail, so the exported step columns are blank. |
 | 2026-10-01 | 6 | Optional box-tracking side counting not built | No real footage to compare it with v1; v1 `estimated_sides` stays. |
+| 2026-10-05 | 7 | Legacy `/analyze` + `/results` (and Streamlit, root `/health`, v1 wrapper) **removed**, not flagged | User answer to Open Question 5. |
+| 2026-10-05 | 7 | Webhooks not built | User: no consumer yet. Backlog. |
+| 2026-10-05 | 7 | Retention needs a dispute flag: added `videos.disputed_at` (+ `file_purged_at`) and `PUT /videos/{id}/dispute` (reviewer+). "Open review" = final_status pending or review | The phase doc says disputed videos are never purged, but no dispute field existed. |
+| 2026-10-05 | 7 | Login limiter stays in-process; nginx `limit_req` (10/min/IP on login) is the shared layer across replicas | A DB-backed limiter isn't worth it for one API container. |
+| 2026-10-05 | 7 | Separate Prometheus registries: API (latency + queue gauges read from the DB at scrape time) and worker (analysis duration, own port) | Queue gauges must not be reported once per worker. Route label = template with the `/api/v1` prefix re-added (FastAPI 0.142 reports router-relative paths). |
+| 2026-10-05 | 7 | Frontend keeps hand-written zod schemas (runtime validation); generated `openapi.ts` + `contract.ts` enforce they match at compile time | Replacing zod would remove runtime validation; the contract check gives the CI drift guard the phase asked for. `schema_version` is now `Literal["2.0"]` in the backend to match. |
+| 2026-10-05 | 7 | `docker compose up` = dev (override auto-loaded); production uses `-f docker-compose.yml` | The phase asked for an override file; acceptance 1 then works on a clean machine without a secret, while production fails fast without one. |
+| 2026-10-05 | 7 | npm audit gate: `--omit=dev --audit-level=high` | The react-router 6 advisories (moderate) have no 6.x fix; they cover backslash open redirects (our only user-controlled navigation, `?next=`, is now same-origin-checked) and SSR (unused). |
+| 2026-10-05 | 7 | Worker liveness = heartbeat file touched every 10 s after a DB `SELECT 1` (`VMS_WORKER_HEARTBEAT_FILE`) | `docker compose up --wait` needs a healthcheck on every service. |
 
 ## Open questions for the user (from IMPLEMENTATION.md §11)
 
@@ -214,12 +238,12 @@ Phase 0 (all done):
 2. Real sample videos plus a human-labeled eval set for Phase 6? — _unanswered_
 3. GPU in production? — _unanswered_
 4. Deploy target, storage (S3?), retention period? — _unanswered_
-5. Integrations and webhooks? Keep the legacy `/analyze` endpoint? — _unanswered_
+5. Integrations and webhooks? Keep the legacy `/analyze` endpoint? — **answered 2026-10-05: remove the legacy endpoints; no webhooks for now.**
 
 ## Known issues / tech debt
 
 - Phase 4: dashboard "today" uses the browser's local date, but the API compares it to UTC `created_at`. **Fixed in Phase 5 for reviewers and admins** (tz-aware `/reports/summary`). The operator tiles still use `GET /videos?date_from=` (UTC), so operators can still see counts off by a few hours around midnight. `GET /videos` could accept `tz_offset_min` too.
-- Phase 5: the production JS bundle is ~820 kB (Recharts). Lazy-load `/reports`, `/review`, `/admin` (and the dashboard charts) in Phase 7.
+- Fixed in Phase 7: bundle split (main 383 kB); the Recharts chunk (~388 kB) loads only on chart pages.
 - Phase 5: `/reports/summary` loads every video in the range into memory (max range 1 year). Fine for current volumes; precompute per-check rows if it gets slow.
 - Phase 5: the review page loads at most 100 queue items (`page_size=100`); the header shows the true total.
 - Phase 5: station/warehouse **edit/delete** still don't exist (admins can only create). Users can't be deleted, only deactivated (by design).
@@ -227,8 +251,7 @@ Phase 0 (all done):
 - Phase 5: jsdom has no `HTMLDialogElement.showModal`, so dialog tests query with `hidden: true`.
 - Phase 5: the CSV's Excel compatibility is asserted by tests (BOM, columns) but wasn't opened in a real Excel (none on the dev machine).
 - Phase 4: signed media URLs expire after `VMS_MEDIA_URL_TTL_S`; a page left open longer needs a reload to keep streaming.
-- Phase 4: TS types are hand-maintained (`frontend/src/types/*.ts` mirror `schemas.py` and `result.py`). Consider openapi-typescript in Phase 7.
-- Phase 4: the `/_ui` gallery chunk is still emitted in production builds (the route itself is dev-only).
+- Fixed in Phase 7: TS types are checked against generated OpenAPI types (`contract.ts`).
 - Phase 4: OpenCV writes `mp4v`, which browsers can't play. Test videos for the player need H.264 (`avc1`; works on Windows via MSMF).
 
 - Fixed in Phase 1: `process_type` now selects the rubric; YOLO is used; `estimated_sides` is scored (Return `six_sides`).
@@ -240,19 +263,31 @@ Phase 0 (all done):
 - Phase 6: the package-box heuristic fires on almost any frame, so the synthetic per-step accuracy for `unboxing` is 0 % (labelled missed). Known Phase 1 weakness; the custom `package_box` / `package_polybag` classes should fix it.
 - No real sample videos yet (`data/samples/` is empty). The timings below come from a synthetic video.
 - Fixed in Phase 0: models loading at import, OCR cadence, free +5, hard-coded sides.
-- `app.py` is not covered by ruff (legacy, retired in Phase 7).
 - FastAPI's TestClient emits a Starlette deprecation warning about `httpx` (harmless).
 - Fixed in Phase 2: the API is async (job queue) and persists everything. The Streamlit app still doesn't persist results (retired in Phase 7).
 - Starlette spools multipart uploads to a temp file before the handler runs, so the size limit is enforced while copying to storage, not during the network transfer. A reverse-proxy body limit (Phase 7) should cap it earlier.
 - Dedupe is check-then-insert, so two identical uploads at the same instant can both be stored. Low risk. A unique partial index on `sha256` could fix it later.
+- Phase 7 security review (below the reporting bar, 5/10): a duplicate upload returns the *existing* video record even when it belongs to another operator/API key, revealing its AWB/order ref/status. The caller must already hold the identical file. Fix: restrict the dedupe lookup to `principal.video_filter()`.
+- Phase 7: acceptance 2 ("CI green on a PR") was verified locally only (every CI step run by hand: both DB legs, frontend checks, audits, compose build, Playwright E2E against the stack in production mode). The workflows haven't run on GitHub yet at the time of writing.
+- Phase 7: the CI E2E builds `WITH_ML=0` for speed; the ML image is built nightly. The local E2E ran on the ML image.
+- Phase 7: `setup.sh` was syntax-checked but not run end to end (no Linux/macOS host here); `setup.ps1` was run on a fresh clone.
 - `audit_results.db` on this machine has **0 rows**, so `import-legacy` imported nothing (it was tested with a synthetic legacy DB).
-- Login rate limiting is **in-memory per process** (resets on restart, not shared across workers/instances). Phase 7 should move it to the DB/Redis or the reverse proxy.
+- Login rate limiting is in-memory per API process; nginx adds a shared per-IP limit (Phase 7). Running the API without nginx loses the shared layer.
 - In dev without `VMS_JWT_SECRET`, each process makes a random secret, so tokens die on every `uvicorn --reload` restart. Set `VMS_JWT_SECRET` in `.env` to avoid re-logging in.
 - Tokens aren't revoked on password change (they expire after `jwt_ttl_hours`). Deactivation does cut them off immediately.
 - Station/warehouse **update/delete** endpoints don't exist yet (§8 lists only GET/POST); add in Phase 5 if the admin UI needs them.
 - Stale jobs are re-queued at the start of each worker loop iteration, so nothing reaps them while every worker is busy.
 
 ## Session log
+
+### 2026-10-05 — Phase 7 session (v1.0)
+- Baseline 323 passed. Branch `phase-7-production`. Asked the user Open Question 5: remove the legacy API, skip webhooks.
+- Backend now **325 passed** on SQLite and on Postgres 18 (local throwaway cluster on port 55432 via `initdb`; CI uses postgres:16); ruff clean. Frontend: typecheck, lint, **35 tests**, build all green.
+- **Acceptance 1:** fresh clone, `cp .env.example .env && docker compose up -d`, `create-admin` → working app at http://localhost (health ok, login, upload). Production mode (`-f docker-compose.yml`, VMS_ENV=prod) refuses to start without a JWT secret and runs with one (JSON logs carry the nginx request id). `scripts/setup.ps1` on another fresh clone: everything automatic, picked port 8080 because 80 was busy, demo login works.
+- **Acceptance 2:** every CI step run locally, and the Playwright smoke passed against the compose stack twice (dev mode with 1 worker, production mode with 2 workers; ~18 s each, ML image). Not yet observed on GitHub (see Known issues).
+- **Acceptance 3:** security-review: no finding at >= 8/10; one 5/10 note recorded in Known issues; the `?next=` open redirect found during the audit is fixed and tested.
+- **Acceptance 4:** no legacy entry points remain (user chose removal).
+- Also checked: `--scale worker=3` and graceful stop (jobs released), `purge --dry-run` inside the container, `/metrics` not reachable through nginx, CSP on every location (docs pages have their own CSP for Swagger's CDN assets).
 
 ### 2026-10-01 — Phase 6 session
 - Baseline 293 passed. Branch `phase-6-ml`. Backend now **323 passed**; ruff clean (backend and ml). Frontend typecheck, lint and 26 tests are green (only `copy.ts` gained 4 check labels).
@@ -312,7 +347,16 @@ Phase 0 (all done):
 
 ## Handoff notes for next session
 
-**Phase 7 can start independently (nothing in it depends on trained models). To finish Phase 6 properly, someone needs to supply data** (see Known issues). State after Phase 6:
+**v1.0 is done.** There is no Phase 8 doc. Next work comes from the backlog, plus data for Phase 6:
+- **Data first:** collect real videos with human verdicts (the review queue produces them), then follow the Phase 6 steps below to calibrate thresholds and train a detector. This is the biggest lever on the review rate.
+- **Backlog ideas:** S3/MinIO storage (implement the `Storage` protocol; `path()` would need a local cache for OpenCV); SSO (OIDC) instead of passwords; outgoing webhooks (`analysis.completed`, `review.completed`, HMAC-signed, retries); a mobile capture app that uploads with an API key; live-camera ingest (RTSP -> segments -> jobs); multi-tenant (a tenant id on warehouses/users/videos and scoped queries); PDF report per video; station/warehouse edit/delete; a DB-backed login limiter; fix the dedupe disclosure noted in Known issues; Redis/queue only if job volume outgrows DB polling.
+- **Running it:** `scripts/setup.ps1` / `scripts/setup.sh` (README). Production: `docs/DEPLOY.md`. API usage: `docs/API.md`.
+- **Conventions added in Phase 7:** after any API schema change run `python -m vms.cli openapi` and `npm run gen:api` (tests/CI fail otherwise; `contract.ts` tells you which zod schema to update). New routes go into `MATRIX` in `test_role_matrix.py`. New settings go into `.env.example`. Postgres check: `VMS_TEST_DB_URL=postgresql+psycopg://… pytest backend/tests -q`.
+- Environment gotchas: in this Windows setup, Docker's credential helper needs `C:\Program Files\Docker\Docker\resources\bin` on PATH for Git Bash; PowerShell 5.1 `Set-Content -Encoding utf8` writes a BOM; Bash heredocs mangle backslashes, so write such files with the editor tool.
+
+### Phase 6 handoff (kept for reference)
+
+**Phase 7 could start independently (nothing in it depends on trained models). To finish Phase 6 properly, someone needs to supply data** (see Known issues). State after Phase 6:
 - **To get real numbers:** (1) put videos in `data/samples/`; (2) after Phase 5 reviews exist, `python -m vms.cli export-eval --out data/eval/labels.csv`, or hand-write labels like `ml/eval_labels.example.csv` (step columns optional); (3) `python ml/evaluate.py --labels data/eval/labels.csv --rubric return-v1,forward-v1`; copy the `.md` into `docs/eval/`; (4) `python ml/extract_frames.py`, annotate per `ml/dataset/README.md`, `python ml/train.py`; (5) set `VMS_YOLO_WEIGHTS=data/models/vms-det-<date>.pt` and rerun the evaluation with `--rubric return-v2,forward-v2` (use `--from-cache` only for rubric-only changes); (6) `python ml/calibrate.py ...`, then copy the diff by hand into `*-v3.yaml`; (7) switch with `VMS_RUBRIC_FORWARD` / `VMS_RUBRIC_RETURN`. Recommended production ids: stay on `forward-v1` / `return-v1` until step 5 shows v2's false-pass rate <= v1's on real labels.
 - New files: `backend/vms/evaluation/*`, `backend/vms/analysis/detectors/model_card.py`, `rubrics/{forward,return}-v2.yaml`, `ml/{evaluate,calibrate,train,make_synthetic_eval}.py`, `ml/{data.yaml,eval_labels.example.csv,dataset/README.md}`, `docs/eval/synthetic-v{1,2}.md`. New settings (in `.env.example`): `VMS_YOLO_MODEL_CARD`, `VMS_YOLO_EVERY_N`, `VMS_TAG_CLOSE_UP_FRAC`, `VMS_RUBRIC_FORWARD`, `VMS_RUBRIC_RETURN`.
 - Adding a check key to any rubric: add plain wording to `vms/sop_doc.py::WHAT_IT_LOOKS_FOR` (a test requires it for v2) and a label in `frontend/src/lib/copy.ts::CHECK_LABEL`. Adding a metric: add it to `METRIC_KEYS` (the eval cache fingerprint includes the metric set, so old caches are re-run automatically).
