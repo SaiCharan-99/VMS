@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, RefreshCw } from "lucide-react";
+import { ArrowLeft, Flag, RefreshCw } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { api } from "@/api/endpoints";
 import { useVideo } from "@/api/queries";
@@ -38,6 +38,15 @@ export function VideoDetailPage() {
     onError: (err) => toast(err instanceof Error ? err.message : "Couldn't queue it.", "error"),
   });
 
+  const dispute = useMutation({
+    mutationFn: (disputed: boolean) => api.setDisputed(id, disputed),
+    onSuccess: (video) => {
+      toast(video.disputed ? "Marked as disputed. The file is kept." : "Dispute cleared.");
+      void qc.invalidateQueries({ queryKey: ["video", id] });
+    },
+    onError: (err) => toast(err instanceof Error ? err.message : "Couldn't update it.", "error"),
+  });
+
   if (detail.isPending) return <DetailSkeleton />;
   if (detail.isError) {
     return (
@@ -63,7 +72,18 @@ export function VideoDetailPage() {
         </Link>
         <span className="mono min-w-0 truncate text-text-2">{v.original_filename}</span>
         <span className="chip">{v.process_type}</span>
+        {v.disputed && <span className="chip">Disputed</span>}
         <span className="flex-1" />
+        {canReanalyze && (
+          <Button
+            onClick={() => dispute.mutate(!v.disputed)}
+            loading={dispute.isPending}
+            title="A disputed video's file is never deleted by retention"
+          >
+            <Flag size={15} aria-hidden />
+            {v.disputed ? "Clear dispute" : "Mark disputed"}
+          </Button>
+        )}
         {canReanalyze && v.stream_url && (
           <Button
             onClick={() => reanalyze.mutate()}

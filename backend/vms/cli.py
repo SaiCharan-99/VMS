@@ -6,6 +6,7 @@ python -m vms.cli create-admin --email a@example.com --name "Ada"   # prompts fo
 python -m vms.cli seed-demo                                         # dev only
 python -m vms.cli sop-doc --out docs/SOP.md                         # operator guide from rubrics
 python -m vms.cli export-eval --out data/eval/labels.csv            # human reviews -> eval labels
+python -m vms.cli openapi --out frontend/openapi.json             # API schema for type generation
 python -m vms.cli purge --older-than-days 180 [--dry-run]           # retention file purge
 """
 
@@ -124,6 +125,17 @@ def _purge(args: argparse.Namespace) -> int:
     return 0
 
 
+def _openapi(args: argparse.Namespace) -> int:
+    import json
+
+    from vms.api.main import create_app
+
+    text = json.dumps(create_app().openapi(), indent=2, sort_keys=True) + "\n"
+    args.out.write_text(text, encoding="utf-8", newline="\n")
+    print(f"Wrote {args.out}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="vms.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -159,6 +171,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--older-than-days", type=int, help="default: VMS_RETENTION_DAYS")
     p.add_argument("--dry-run", action="store_true", help="only count what would be deleted")
     p.set_defaults(func=_purge)
+
+    p = sub.add_parser("openapi", help="Write the OpenAPI schema (frontend type generation)")
+    p.add_argument("--out", type=Path, default=Path("frontend/openapi.json"))
+    p.set_defaults(func=_openapi)
 
     args = parser.parse_args(argv)
     configure_logging()

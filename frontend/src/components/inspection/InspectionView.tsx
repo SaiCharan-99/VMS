@@ -179,7 +179,9 @@ export const InspectionView = forwardRef<
         ) : (
           <Card>
             <CardBody className="text-sm text-text-2">
-              No video file for this record (imported from the old system).
+              {v.file_purged
+                ? "The video file was deleted by the retention policy. The analysis and evidence frames are kept."
+                : "No video file for this record (imported from the old system)."}
             </CardBody>
           </Card>
         )}

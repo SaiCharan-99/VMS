@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ReactNode } from "react";
 import {
   createBrowserRouter,
   Link,
@@ -12,18 +12,32 @@ import { ROUTER_FUTURE } from "@/lib/routerFlags";
 import { AuthProvider } from "@/auth/AuthProvider";
 import { RequireRole } from "@/auth/RequireRole";
 import { AppShell } from "@/components/AppShell";
-import { ToastProvider } from "@/components/ui";
+import { Skeleton, ToastProvider } from "@/components/ui";
 import { ADMIN_ONLY, REVIEWER_UP } from "@/auth/roles";
-import { AdminPage } from "@/pages/AdminPage";
-import { DashboardPage } from "@/pages/DashboardPage";
 import { LoginPage } from "@/pages/LoginPage";
-import { ReportsPage } from "@/pages/ReportsPage";
-import { ReviewPage } from "@/pages/ReviewPage";
 import { UploadPage } from "@/pages/UploadPage";
 import { VideoDetailPage } from "@/pages/VideoDetailPage";
 import { VideosPage } from "@/pages/VideosPage";
 
-const UiGallery = lazy(() => import("@/pages/UiGallery").then((m) => ({ default: m.UiGallery })));
+// Chart-heavy and role-restricted pages load on demand, keeping Recharts out of the main bundle.
+const DashboardPage = lazy(() =>
+  import("@/pages/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+);
+const ReviewPage = lazy(() =>
+  import("@/pages/ReviewPage").then((m) => ({ default: m.ReviewPage })),
+);
+const ReportsPage = lazy(() =>
+  import("@/pages/ReportsPage").then((m) => ({ default: m.ReportsPage })),
+);
+const AdminPage = lazy(() => import("@/pages/AdminPage").then((m) => ({ default: m.AdminPage })));
+// Behind the DEV check so production builds don't emit the gallery chunk at all.
+const UiGallery = import.meta.env.DEV
+  ? lazy(() => import("@/pages/UiGallery").then((m) => ({ default: m.UiGallery })))
+  : () => null;
+
+function Loading({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<Skeleton className="h-64 w-full" />}>{children}</Suspense>;
+}
 
 function Root() {
   return (
@@ -56,7 +70,15 @@ const routes: RouteObject[] = [
           </RequireRole>
         ),
         children: [
-          { path: "/", element: <DashboardPage />, handle: { title: "Dashboard" } },
+          {
+            path: "/",
+            element: (
+              <Loading>
+                <DashboardPage />
+              </Loading>
+            ),
+            handle: { title: "Dashboard" },
+          },
           { path: "/upload", element: <UploadPage />, handle: { title: "Upload" } },
           { path: "/videos", element: <VideosPage />, handle: { title: "Inspections" } },
           { path: "/videos/:id", element: <VideoDetailPage />, handle: { title: "Inspection" } },
@@ -64,7 +86,9 @@ const routes: RouteObject[] = [
             path: "/review",
             element: (
               <RequireRole roles={REVIEWER_UP}>
-                <ReviewPage />
+                <Loading>
+                  <ReviewPage />
+                </Loading>
               </RequireRole>
             ),
             handle: { title: "Review queue" },
@@ -73,7 +97,9 @@ const routes: RouteObject[] = [
             path: "/reports",
             element: (
               <RequireRole roles={REVIEWER_UP}>
-                <ReportsPage />
+                <Loading>
+                  <ReportsPage />
+                </Loading>
               </RequireRole>
             ),
             handle: { title: "Reports" },
@@ -82,7 +108,9 @@ const routes: RouteObject[] = [
             path: "/admin",
             element: (
               <RequireRole roles={ADMIN_ONLY}>
-                <AdminPage />
+                <Loading>
+                  <AdminPage />
+                </Loading>
               </RequireRole>
             ),
             handle: { title: "Admin" },
@@ -92,9 +120,9 @@ const routes: RouteObject[] = [
                 {
                   path: "/_ui",
                   element: (
-                    <Suspense fallback={null}>
+                    <Loading>
                       <UiGallery />
-                    </Suspense>
+                    </Loading>
                   ),
                   handle: { title: "UI components" },
                 },

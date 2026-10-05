@@ -92,6 +92,11 @@ export const api = {
   me: () => request(`${V1}/auth/me`, userSchema),
   videos: (q: VideoQuery) => request(`${V1}/videos${qs(q)}`, videoPage),
   video: (id: number) => request(`${V1}/videos/${id}`, videoDetailSchema),
+  setDisputed: (id: number, disputed: boolean) =>
+    request(`${V1}/videos/${id}/dispute`, videoSchema, {
+      method: "PUT",
+      body: JSON.stringify({ disputed }),
+    }),
   reanalyze: (id: number) => request(`${V1}/videos/${id}/reanalyze`, jobSchema, { method: "POST" }),
   job: (id: number) => request(`${V1}/jobs/${id}`, jobSchema),
   stations: () => request(`${V1}/stations`, z.array(stationSchema)),

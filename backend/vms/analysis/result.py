@@ -1,4 +1,4 @@
-"""AnalysisResult — the versioned result contract (IMPLEMENTATION.md §5)."""
+"""AnalysisResult â€” the versioned result contract (IMPLEMENTATION.md Â§5)."""
 
 from typing import Literal
 
@@ -72,7 +72,7 @@ class StepResult(BaseModel):
 
 
 class AnalysisResult(BaseModel):
-    schema_version: str = SCHEMA_VERSION
+    schema_version: Literal["2.0"] = SCHEMA_VERSION
     process_type: Literal["Forward", "Return"]
     rubric_id: str
     engine: EngineInfo

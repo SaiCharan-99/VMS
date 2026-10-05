@@ -85,6 +85,8 @@ export const videoSchema = z.object({
   stream_url: z.string().nullable().optional(),
   latest_analysis: analysisBriefSchema.nullable().optional(),
   human_reviewed: z.boolean().optional(),
+  disputed: z.boolean().optional(),
+  file_purged: z.boolean().optional(),
 });
 
 export const reviewSchema = z.object({
