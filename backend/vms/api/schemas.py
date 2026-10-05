@@ -227,6 +227,7 @@ class HealthOut(BaseModel):
     status: str
     version: str
     db: str
+    storage: str
     detectors: dict[str, bool]
 
 

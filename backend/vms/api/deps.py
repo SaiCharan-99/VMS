@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from vms.db import get_sessionmaker
 from vms.db.models import Role, User
+from vms.logging import bind_log_context
 from vms.security import decode_access_token, verify_media_signature
 from vms.services import api_keys
 from vms.services.principal import Principal
@@ -39,6 +40,7 @@ def get_current_principal(
         key = api_keys.verify(db, api_key)
         if key is None:
             raise _unauthorized("Invalid or revoked API key.")
+        bind_log_context(api_key_id=key.id)
         return Principal.for_api_key(key)
     if creds is None:
         raise _unauthorized("Not authenticated.")
@@ -46,6 +48,7 @@ def get_current_principal(
     user = db.get(User, user_id) if user_id is not None else None
     if user is None or not user.is_active:
         raise _unauthorized("Invalid or expired token.")
+    bind_log_context(user_id=user.id)
     return Principal.for_user(user)
 
 

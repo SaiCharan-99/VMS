@@ -45,7 +45,13 @@ class Settings(BaseSettings):
     # COCO has no apparel classes, so the contour heuristic still counts as "product".
     heuristic_product_fallback: bool = True
     max_upload_mb: int = 500
+    # Browser origins allowed to call the API cross-origin. The compose stack serves the UI
+    # and API from one origin, so production usually needs none.
     cors_origins: list[str] = ["http://localhost:5173"]
+    # "text" for humans, "json" for log shipping (one object per line with request/job ids).
+    log_format: str = "text"
+    # Workers serve their own Prometheus metrics (analysis durations) on this port when set.
+    worker_metrics_port: int | None = None
     worker_poll_s: float = 1.5
     # A running job whose heartbeat is older than this is assumed lost and re-queued.
     job_stale_s: int = 300

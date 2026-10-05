@@ -18,7 +18,8 @@ from vms.analysis import analyze_video
 from vms.config import Settings, get_settings
 from vms.db import session_scope
 from vms.db.models import Job, Video, new_uuid
-from vms.logging import configure_logging
+from vms.logging import bind_log_context, clear_log_context, configure_logging
+from vms.metrics import ANALYSIS_DURATION
 from vms.services import analyses, audit, jobs
 from vms.storage import Storage, get_storage
 
@@ -43,6 +44,11 @@ def run_job(
     with session_scope() as s:
         video = s.get(Video, s.get(Job, job_id).video_id)
         storage_key, process_type = video.storage_key, video.process_type.value
+    bind_log_context(job_id=job_id, video_id=video.id, worker_id=worker_id)
+    started = time.monotonic()
+
+    def observe(outcome: str) -> None:
+        ANALYSIS_DURATION.labels(process_type, outcome).observe(time.monotonic() - started)
 
     analysis_uuid = new_uuid()
     evidence_key = f"evidence/{analysis_uuid}"
@@ -78,6 +84,7 @@ def run_job(
         return str(exc)
     except Exception as exc:
         storage.delete(evidence_key)
+        observe("failed")
         error = f"{type(exc).__name__}: {exc}"
         log.warning("Job %s failed: %s", job_id, error)
         with session_scope() as s:
@@ -92,6 +99,7 @@ def run_job(
             return "lost"
         video = s.get(Video, s.get(Job, job_id).video_id)
         analyses.save_result(s, video, job_id, result, analysis_uuid)
+    observe(result.status)
     log.info("Job %s done: %s %s/100", job_id, result.status, result.total_score)
     return "done"
 
@@ -119,7 +127,10 @@ class Worker:
         if job is None:
             return False
         log.info("Claimed job %s (video %s, attempt %s)", job.id, job.video_id, job.attempts)
-        run_job(job.id, self.worker_id, self.storage, self.settings, stop=lambda: self.stopping)
+        try:
+            run_job(job.id, self.worker_id, self.storage, self.settings, stop=lambda: self.stopping)
+        finally:
+            clear_log_context()
         return True
 
     def run(self, poll_s: float) -> None:
@@ -141,6 +152,12 @@ def main(argv: list[str] | None = None) -> int:
     configure_logging()
 
     worker = Worker(settings)
+    if settings.worker_metrics_port and not args.once:
+        from prometheus_client import start_http_server
+
+        from vms.metrics import WORKER_REGISTRY
+
+        start_http_server(settings.worker_metrics_port, registry=WORKER_REGISTRY)
     if args.once:
         worker.run_once()
         return 0
