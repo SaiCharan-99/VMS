@@ -115,12 +115,16 @@ def test_change_password(anon_client, make_user):
     assert "user.password_changed" in _actions()
 
 
-def test_jwt_secret_required_outside_dev(monkeypatch):
+@pytest.mark.parametrize("secret", [None, "short", "change-me-" + "x" * 40])
+def test_jwt_secret_required_outside_dev(monkeypatch, secret):
     from vms.api.main import create_app
     from vms.config import get_settings
 
     monkeypatch.setenv("VMS_ENV", "prod")
-    monkeypatch.delenv("VMS_JWT_SECRET")
+    if secret is None:
+        monkeypatch.delenv("VMS_JWT_SECRET")
+    else:
+        monkeypatch.setenv("VMS_JWT_SECRET", secret)
     get_settings.cache_clear()
     security.jwt_secret.cache_clear()
     with pytest.raises(security.InsecureConfigError):

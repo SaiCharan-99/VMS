@@ -1,0 +1,20 @@
+# Local development additions, loaded automatically by `docker compose up`.
+# Production: docker compose -f docker-compose.yml up -d   (skips this file)
+services:
+  postgres:
+    ports:
+      - "5432:5432"   # psql / pytest against the stack's database
+  api:
+    environment:
+      VMS_ENV: dev
+      VMS_LOG_FORMAT: text
+    command: ["uvicorn", "vms.api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", "--reload-dir", "/app/vms"]
+    volumes:
+      - vms-data:/data
+      - ./backend/vms:/app/vms:ro
+    ports:
+      - "8000:8000"   # API + /docs + /metrics directly
+  worker:
+    environment:
+      VMS_ENV: dev
+      VMS_LOG_FORMAT: text

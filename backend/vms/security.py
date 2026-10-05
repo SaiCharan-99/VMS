@@ -42,10 +42,11 @@ def verify_password(password_hash: str | None, password: str) -> bool:
 @lru_cache
 def jwt_secret() -> str:
     settings = get_settings()
-    if settings.env != "dev" and len(settings.jwt_secret or "") < MIN_SECRET_LENGTH:
+    secret = settings.jwt_secret or ""
+    if settings.env != "dev" and (len(secret) < MIN_SECRET_LENGTH or "change-me" in secret):
         raise InsecureConfigError(
-            f"VMS_JWT_SECRET must be at least {MIN_SECRET_LENGTH} characters "
-            f"when VMS_ENV={settings.env!r}."
+            f"VMS_JWT_SECRET must be at least {MIN_SECRET_LENGTH} random characters (not the "
+            f"example placeholder) when VMS_ENV={settings.env!r}."
         )
     if settings.jwt_secret:
         return settings.jwt_secret

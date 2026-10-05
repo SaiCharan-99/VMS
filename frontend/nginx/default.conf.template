@@ -1,0 +1,71 @@
+# Rendered by the nginx image's envsubst entrypoint: ${API_UPSTREAM}, ${MAX_UPLOAD_MB}.
+limit_req_zone $binary_remote_addr zone=login:10m rate=10r/m;
+
+map $http_x_request_id $req_id {
+    default $http_x_request_id;
+    ""      $request_id;
+}
+
+server {
+    listen 80;
+    server_name _;
+    server_tokens off;
+
+    # Uploads are capped here, before they reach the API (which also enforces VMS_MAX_UPLOAD_MB).
+    client_max_body_size ${MAX_UPLOAD_MB}m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy same-origin always;
+    add_header Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'" always;
+
+    location = /healthz {
+        access_log off;
+        return 200 "ok\n";
+    }
+
+    location /api/ {
+        proxy_pass http://${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $req_id;
+        proxy_request_buffering off;
+        proxy_buffering off;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    # Shared login throttle across API replicas (the API's own limiter is per process).
+    location = /api/v1/auth/login {
+        limit_req zone=login burst=5 nodelay;
+        limit_req_status 429;
+        proxy_pass http://${API_UPSTREAM};
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $req_id;
+    }
+
+    # Interactive API docs. /metrics is deliberately not proxied.
+    location ~ ^/(docs|redoc|openapi\.json)$ {
+        proxy_pass http://${API_UPSTREAM};
+        proxy_set_header Host $host;
+    }
+
+    location /assets/ {
+        root /usr/share/nginx/html;
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options nosniff always;
+    }
+
+    location / {
+        root /usr/share/nginx/html;
+        try_files $uri /index.html;
+        add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+    }
+}
